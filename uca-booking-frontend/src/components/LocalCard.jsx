@@ -9,7 +9,7 @@ const LocalCard = ({ local }) => {
 
   // Fonction appelée au clic sur "Réserver"
   const handleReserve = () => {
-    navigate('/login'); //  Redirection vers LoginPage
+    navigate(`/reservation/${local.id}`); //  Redirection vers la page de réservation
   };
 
   return (

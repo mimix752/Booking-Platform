@@ -2,9 +2,12 @@
   "name": "uca-booking-frontend",
   "version": "1.0.0",
   "description": "Plateforme de réservation des locaux UCA",
+  "type": "module",
   "private": true,
   "dependencies": {
+    "@react-oauth/google": "^0.13.4",
     "axios": "^1.6.0",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
