@@ -23,9 +23,9 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center space-x-3">
-            <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <img src="/uca-logo.png" alt="UCA Logo" className="w-12 h-12" />
-            </div>
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-xl flex items-center justify-center shadow-lg">
+  <img src="/uca-logo.png" alt="UCA Logo" className="w-full h-full object-contain" />
+</div>
             <div>
               <h1 className="text-2xl font-bold text-amber-800">
                 UCA Booking

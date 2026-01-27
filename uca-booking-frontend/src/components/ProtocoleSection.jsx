@@ -33,7 +33,13 @@ const ProtocoleSection = () => {
         
         <div className="grid md:grid-cols-3 gap-8">
           {protocols.map((protocol, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 shadow-sm">
+            <div
+              key={index}
+              className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent 
+                         hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-400/50 
+                         transform transition-all duration-500 hover:-translate-y-2 hover:scale-105 
+                         animate-pulse-slow"
+            >
               <h3 className="text-xl font-semibold text-gray-900 mb-3">
                 {protocol.title}
               </h3>
@@ -42,7 +48,10 @@ const ProtocoleSection = () => {
               </p>
               <ol className="space-y-2">
                 {protocol.steps.map((step, stepIndex) => (
-                  <li key={stepIndex} className="flex items-center text-sm text-gray-700">
+                  <li
+                    key={stepIndex}
+                    className="flex items-center text-sm text-gray-700"
+                  >
                     <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium mr-3">
                       {stepIndex + 1}
                     </span>

@@ -22,7 +22,10 @@ const LoginPage = () => {
     <div className="min-h-screen bg-stone-50 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/uca-logo.png" alt="UCA Logo" className="w-16 h-16 mx-auto mb-4" />
+         <div className="w-28 h-28 sm:w-32 sm:h-32 bg-white rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+  <img src="/uca-logo.png" alt="UCA Logo" className="w-20 sm:w-24 h-20 sm:h-24 object-contain" />
+</div>
+
           <h2 className="text-2xl font-bold text-amber-800">Connexion Admin</h2>
           <p className="text-amber-700">Université Cadi Ayyad</p>
         </div>
