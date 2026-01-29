@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
-import { Plus, Wrench, FileText, TrendingUp, Users, Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Plus, Wrench, FileText, TrendingUp, Users, Calendar, Clock, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -11,6 +11,14 @@ const AdminDashboard = () => {
     confirmees: 0,
     en_attente: 0,
     refusees: 0
+  });
+  const [showAddLocalModal, setShowAddLocalModal] = useState(false);
+  const [newLocal, setNewLocal] = useState({
+    nom: '',
+    type: 'salle',
+    capacite: '',
+    equipements: '',
+    description: ''
   });
 
   useEffect(() => {
@@ -45,6 +53,81 @@ const AdminDashboard = () => {
 
     localStorage.setItem('reservations', JSON.stringify(updatedReservations));
     loadData(); // Recharger les données
+  };
+
+  const exportToCSV = () => {
+    if (reservations.length === 0) {
+      alert('Aucune réservation à exporter');
+      return;
+    }
+
+    // En-têtes du CSV
+    const headers = ['ID', 'Nom', 'Email', 'Date début', 'Date fin', 'Créneau', 'Participants', 'Motif', 'Statut', 'Date création'];
+    
+    // Données
+    const csvData = reservations.map(res => [
+      res.id,
+      res.userName,
+      res.userEmail || '',
+      res.dateDebut,
+      res.dateFin || res.dateDebut,
+      res.creneau,
+      res.participants,
+      `"${res.motif.replace(/"/g, '""')}"`, // Échapper les guillemets
+      res.status,
+      new Date(res.dateCreation).toLocaleString('fr-FR')
+    ]);
+
+    // Créer le contenu CSV
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.join(','))
+    ].join('\n');
+
+    // Créer et télécharger le fichier
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `reservations_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleAddLocal = () => {
+    if (!newLocal.nom || !newLocal.capacite) {
+      alert('Veuillez remplir tous les champs obligatoires (Nom et Capacité)');
+      return;
+    }
+
+    const locaux = JSON.parse(localStorage.getItem('locaux') || '[]');
+    const newLocalData = {
+      id: Date.now().toString(),
+      ...newLocal,
+      capacite: parseInt(newLocal.capacite),
+      equipements: newLocal.equipements.split(',').map(e => e.trim()).filter(e => e),
+      disponible: true,
+      dateAjout: new Date().toISOString()
+    };
+
+    locaux.push(newLocalData);
+    localStorage.setItem('locaux', JSON.stringify(locaux));
+    
+    // Réinitialiser le formulaire
+    setNewLocal({
+      nom: '',
+      type: 'salle',
+      capacite: '',
+      equipements: '',
+      description: ''
+    });
+    setShowAddLocalModal(false);
+    
+    alert('Local ajouté avec succès !');
   };
 
   return (
@@ -215,7 +298,10 @@ const AdminDashboard = () => {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Ajouter un local</h3>
           <p className="text-gray-600 text-sm mb-4">Enregistrez un nouveau local dans la base de données</p>
-          <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button 
+            onClick={() => setShowAddLocalModal(true)}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
             Ajouter
           </button>
         </div>
@@ -241,12 +327,122 @@ const AdminDashboard = () => {
             <FileText className="w-6 h-6 text-green-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Générer un rapport</h3>
-          <p className="text-gray-600 text-sm mb-4">Exportez les statistiques au format PDF ou Excel</p>
-          <button className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-            Exporter
+          <p className="text-gray-600 text-sm mb-4">Exportez les statistiques au format CSV</p>
+          <button 
+            onClick={exportToCSV}
+            className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Exporter CSV
           </button>
         </div>
       </div>
+
+      {/* Modal Ajouter un local */}
+      {showAddLocalModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-amber-800">Ajouter un nouveau local</h2>
+                <button 
+                  onClick={() => setShowAddLocalModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nom du local <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newLocal.nom}
+                    onChange={(e) => setNewLocal({...newLocal, nom: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="Ex: Salle de conférence A"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type de local <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newLocal.type}
+                    onChange={(e) => setNewLocal({...newLocal, type: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  >
+                    <option value="salle">Salle de réunion</option>
+                    <option value="bureau">Bureau</option>
+                    <option value="amphitheatre">Amphithéâtre</option>
+                    <option value="laboratoire">Laboratoire</option>
+                    <option value="atelier">Atelier</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Capacité (nombre de personnes) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={newLocal.capacite}
+                    onChange={(e) => setNewLocal({...newLocal, capacite: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="Ex: 30"
+                    min="1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Équipements (séparés par des virgules)
+                  </label>
+                  <input
+                    type="text"
+                    value={newLocal.equipements}
+                    onChange={(e) => setNewLocal({...newLocal, equipements: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="Ex: Projecteur, Tableau blanc, WiFi"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={newLocal.description}
+                    onChange={(e) => setNewLocal({...newLocal, description: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    rows="3"
+                    placeholder="Description du local..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-4 mt-6">
+                <button
+                  onClick={() => setShowAddLocalModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleAddLocal}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Ajouter le local
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 };

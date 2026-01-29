@@ -1,12 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import Filters from './Filters';
 import LocalCard from './LocalCard';
-import { locaux } from '../data/locaux';
+import { refreshLocaux } from '../data/locaux';
 
 const LocauxSection = () => {
   const [selectedSite, setSelectedSite] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [locaux, setLocaux] = useState([]);
+
+  // Charger les locaux au montage du composant
+  useEffect(() => {
+    const loadLocaux = () => {
+      const allLocaux = refreshLocaux();
+      setLocaux(allLocaux);
+    };
+    
+    loadLocaux();
+    
+    // Écouter les changements dans localStorage (pour rafraîchir quand admin ajoute un local)
+    const handleStorageChange = (e) => {
+      if (e.key === 'locaux') {
+        loadLocaux();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Filtrer les locaux
   const locauxFiltres = locaux.filter(local => {

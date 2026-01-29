@@ -1,4 +1,18 @@
-export const locaux = [
+// Fonction pour charger les locaux depuis localStorage
+const getLocauxFromStorage = () => {
+  try {
+    const savedLocaux = localStorage.getItem('locaux');
+    if (savedLocaux) {
+      return JSON.parse(savedLocaux);
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des locaux:', error);
+  }
+  return [];
+};
+
+// Locaux statiques par défaut (au cas où localStorage est vide)
+const locauxParDefaut = [
   { 
     id: 1, 
     nom: 'Amphithéâtre Principal', 
@@ -64,3 +78,51 @@ export const locaux = [
     equipements: ['Écran', 'Visio'] 
   }
 ];
+
+
+// Fonction pour normaliser le format des locaux (pour compatibilité)
+const normalizeLocal = (local) => {
+  return {
+    id: local.id,
+    nom: local.nom,
+    type: local.type || 'Salle',
+    capacite: local.capacite,
+    site: local.site || 'Campus principal',
+    equipements: Array.isArray(local.equipements) ? local.equipements : 
+                 (local.equipements ? local.equipements.split(',').map(e => e.trim()) : []),
+    disponible: local.disponible !== false,
+    description: local.description || '',
+    image: local.image || '/images/default-room.jpg'
+  };
+};
+
+// Combiner les locaux du localStorage avec les locaux par défaut
+const getCombinedLocaux = () => {
+  const storageLocaux = getLocauxFromStorage();
+  
+  // Si localStorage a des locaux, utiliser ceux-là ET les locaux par défaut
+  if (storageLocaux.length > 0) {
+    const normalizedStorage = storageLocaux
+      .filter(local => local.disponible !== false) // Ne montrer que les locaux disponibles
+      .map(normalizeLocal);
+    
+    const normalizedDefaults = locauxParDefaut.map(normalizeLocal);
+    
+    // Combiner les deux listes (localStorage en premier)
+    return [...normalizedStorage, ...normalizedDefaults];
+  }
+  
+  // Si localStorage est vide, utiliser seulement les locaux par défaut
+  return locauxParDefaut.map(normalizeLocal);
+};
+
+// Export des locaux (sera mis à jour dynamiquement)
+export const locaux = getCombinedLocaux();
+
+// Export de la fonction pour rafraîchir les locaux (utile pour les composants qui ont besoin de recharger)
+export const refreshLocaux = () => {
+  return getCombinedLocaux();
+};
+
+// Export des locaux par défaut (au cas où on en a besoin)
+export const defaultLocaux = locauxParDefaut;

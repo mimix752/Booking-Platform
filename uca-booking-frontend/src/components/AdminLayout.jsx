@@ -41,13 +41,26 @@ const AdminLayout = ({ children }) => {
                 <p className="text-sm text-amber-700">Université Cadi Ayyad</p>
               </div>
             </div>
-            <button 
-              onClick={handleLogout}
-              className="flex items-center space-x-2 px-4 py-2 bg-stone-200 text-amber-800 rounded-lg hover:bg-stone-300 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Se déconnecter</span>
-            </button>
+            <div className="flex items-center space-x-3">
+  {/* Bouton Accueil */}
+  <button
+    onClick={() => navigate('/')}
+    className="flex items-center space-x-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+  >
+    <LayoutDashboard className="w-4 h-4" />
+    <span>Accueil</span>
+  </button>
+
+  {/* Bouton Déconnexion */}
+  <button 
+    onClick={handleLogout}
+    className="flex items-center space-x-2 px-4 py-2 bg-stone-200 text-amber-800 rounded-lg hover:bg-stone-300 transition-colors"
+  >
+    <LogOut className="w-4 h-4" />
+    <span>Se déconnecter</span>
+  </button>
+</div>
+
           </div>
         </div>
       </header>
