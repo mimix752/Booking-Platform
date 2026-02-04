@@ -4,25 +4,24 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { GOOGLE_CLIENT_ID } from '../config/config';
 import { userManager } from '../utils/UserManager';
-import { ArrowLeft, User, Shield, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, User, Shield, Mail, Lock, AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [emailValidation, setEmailValidation] = useState({ isValid: true, error: null });
-  const [loginMode, setLoginMode] = useState('user'); // 'user' ou 'admin'
+  const [loginMode, setLoginMode] = useState('user');
   const [showManualLogin, setShowManualLogin] = useState(false);
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
 
-  // Validation en temps réel de l'email
   const validateEmailRealTime = (emailValue) => {
     if (!emailValue) {
       setEmailValidation({ isValid: true, error: null });
       return;
     }
-
     const validation = userManager.isValidUCAEmail(emailValue);
     setEmailValidation(validation);
   };
@@ -34,42 +33,27 @@ const LoginPage = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
+    if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
-
-  // Configuration Google OAuth2 importée depuis config.js
 
   const handleGoogleSuccess = (credentialResponse) => {
     try {
-      // Décoder le JWT token pour récupérer les informations utilisateur
       const base64Url = credentialResponse.credential.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c =>
+        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+      ).join(''));
 
       const userData = JSON.parse(jsonPayload);
-
-      // Vérifier si l'email est du domaine UCA
       if (!userData.email.endsWith('@uca.ma') && !userData.email.endsWith('@uca.ac.ma')) {
         setError('Seuls les emails académiques UCA sont autorisés (@uca.ma ou @uca.ac.ma)');
         return;
       }
-
-      // Connexion réussie
-      const user = {
-        name: userData.name,
-        email: userData.email,
-        picture: userData.picture
-      };
-
+      const user = { name: userData.name, email: userData.email, picture: userData.picture };
       login(user, false);
       navigate('/');
-
-    } catch (error) {
-      console.error('Erreur lors du traitement de la connexion Google:', error);
+    } catch (err) {
+      console.error(err);
       setError('Erreur lors de la connexion avec Google');
     }
   };
@@ -82,330 +66,333 @@ const LoginPage = () => {
   const handleManualLogin = (e) => {
     e.preventDefault();
     setError('');
-
     try {
-      // Utiliser le gestionnaire d'utilisateurs sécurisé
       const userData = userManager.login(email, password);
-
-      // Vérifier si c'est un admin
       const isAdminUser = userData.role === 'admin';
-
       login(userData, isAdminUser);
-
-      // Rediriger selon le rôle
-      if (isAdminUser) {
-        navigate('/admin-dashboard');
-      } else {
-        navigate('/');
-      }
-
-    } catch (error) {
-      setError(error.message);
+      navigate(isAdminUser ? '/admin-dashboard' : '/');
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
     setError('');
-
     try {
-      // Utiliser le gestionnaire d'utilisateurs sécurisé
       const userData = userManager.login(email, password);
-
-      // Vérifier si c'est vraiment un admin
-      if (userData.role !== 'admin') {
-        throw new Error('Accès administrateur refusé. Ce compte n\'a pas les privilèges requis.');
-      }
-
+      if (userData.role !== 'admin') throw new Error('Accès administrateur refusé.');
       login(userData, true);
       navigate('/admin-dashboard');
-
-    } catch (error) {
-      setError(error.message);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   const handleSignUp = (e) => {
     e.preventDefault();
     setError('');
-
     try {
-      // Utiliser le gestionnaire d'utilisateurs sécurisé
       const userData = userManager.register(email, password);
-
       login(userData, false);
       navigate('/');
-
-    } catch (error) {
-      setError(error.message);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-          {/* Bouton retour */}
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center text-amber-800 hover:text-amber-900 transition-colors mb-6"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Retour à l'accueil
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+        
+        .animate-fadeIn { animation: fadeIn 0.8s ease-out; }
+        .animate-slideInRight { animation: slideInRight 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .animate-slideInLeft { animation: slideInLeft 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        
+        .input-focus:focus {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .btn-hover:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-hover:active {
+          transform: translateY(0);
+        }
+
+        .shimmer-btn {
+          background-size: 200% 100%;
+          background-position: -100% 0;
+          transition: background-position 0.5s ease;
+        }
+        
+        .shimmer-btn:hover {
+          background-position: 100% 0;
+        }
+      `}</style>
+
+      <div className="min-h-screen flex relative overflow-hidden">
+        
+        {/* Left Side - Decorative */}
+        <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100">
+          {/* Pattern background */}
+          <div
+  className="absolute inset-0 opacity-15"
+  style={{ 
+    backgroundImage: "url('/pattern.png')", 
+    backgroundRepeat: "no-repeat",      // empêche la répétition
+    backgroundSize: "cover",            // couvre tout l'espace
+    backgroundPosition: "center"        // centre l'image
+  }}
+/>
+
+          
+          {/* Content */}
+          <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24 animate-slideInLeft">
+            {/* Logo */}
+            <div className="mb-12 ">
+              <img 
+                src="/logo-nobck.png" 
+                alt="UCA Logo" 
+                className="w-32 h-32 object-contain drop-shadow-2xl" 
+              />
+            </div>
+            
+            {/* Title */}
+            <div className="mb-8">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <div className="w-12 h-1 bg-gradient-to-r from-amber-500 to-transparent rounded-full" />
+                
+              </div>
+              <h1 className="text-5xl xl:text-6xl font-bold text-stone-800 mb-6 leading-tight">
+                Accédez à votre
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500">
+                  Espace UCA
+                </span>
+              </h1>
+              <p className="text-lg text-stone-600 leading-relaxed max-w-md">
+               Connectez-vous pour gérer facilement et en toute sécurité les salles et espaces institutionnels de l’Université Cadi Ayyad.
+              </p>
+            </div>
+
+            
+            
+          </div>
+        </div>
+
+        {/* Right Side - Login Form */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 bg-white relative">
+          
+          {/* Mobile logo */}
+          <div className="lg:hidden absolute top-8 left-8">
+            <img 
+              src="/logo-nobck.png" 
+              alt="UCA Logo" 
+              className="w-16 h-16 object-contain drop-shadow-lg" 
+            />
+          </div>
+
+          {/* Back button */}
+          <button 
+            onClick={() => navigate('/')} 
+            className="absolute top-8 right-8 flex items-center gap-2 text-stone-600 hover:text-amber-600 transition-colors group">
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden sm:inline font-medium">Retour</span>
           </button>
 
-          <div className="text-center mb-8">
-            <div className="w-28 h-28 sm:w-32 sm:h-32 bg-white rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <img src="/uca-logo.png" alt="UCA Logo" className="w-20 sm:w-24 h-20 sm:h-24 object-contain" />
+          {/* Form Container */}
+          <div className="w-full max-w-md animate-slideInRight">
+            
+            {/* Header */}
+            <div className="mb-10">
+              <h2 className="text-3xl font-bold text-stone-900 mb-2">
+                {loginMode === 'user' ? 'Bienvenue' : 'Accès Administrateur'}
+              </h2>
+              <p className="text-stone-600">
+                {loginMode === 'user' 
+                  ? 'Connectez-vous pour continuer' 
+                  : 'Connexion sécurisée pour les administrateurs'}
+              </p>
             </div>
 
-            <h2 className="text-2xl font-bold text-amber-800 mb-2">
-              {loginMode === 'user' ? 'Connexion Personnel' : 'Connexion Admin'}
-            </h2>
-            <p className="text-amber-700">Université Cadi Ayyad</p>
-          </div>
+            {/* Mode Switcher */}
+            <div className="mb-8">
+              <div className="relative bg-stone-100 rounded-2xl p-1.5">
+                <div 
+                  className="absolute top-1.5 bottom-1.5 bg-white rounded-xl shadow-md transition-all duration-500 ease-out"
+                  style={{
+                    left: loginMode === 'user' ? '6px' : '50%',
+                    right: loginMode === 'user' ? '50%' : '6px',
+                  }} 
+                />
+                
+                <div className="relative flex gap-2">
+                  <button 
+                    onClick={() => { setLoginMode('user'); setError(''); setShowManualLogin(false); }}
+                    className={`flex-1 flex items-center justify-center py-3 px-4 rounded-xl transition-all duration-500 font-semibold text-sm ${
+                      loginMode === 'user' ? 'text-stone-900' : 'text-stone-500'
+                    }`}>
+                    <User className="w-4 h-4 mr-2" /> Personnel
+                  </button>
+                  
+                  <button 
+                    onClick={() => { setLoginMode('admin'); setError(''); setShowManualLogin(false); }}
+                    className={`flex-1 flex items-center justify-center py-3 px-4 rounded-xl transition-all duration-500 font-semibold text-sm ${
+                      loginMode === 'admin' ? 'text-stone-900' : 'text-stone-500'
+                    }`}>
+                    <Shield className="w-4 h-4 mr-2" /> Admin
+                  </button>
+                </div>
+              </div>
+            </div>
 
-          {/* Switch entre modes */}
-          <div className="flex bg-stone-100 rounded-lg p-1 mb-6">
-            <button
-              onClick={() => {
-                setLoginMode('user');
-                setError('');
-                setShowManualLogin(false);
-              }}
-              className={`flex-1 flex items-center justify-center py-2 px-4 rounded-md transition-colors ${
-                loginMode === 'user' 
-                  ? 'bg-white text-amber-800 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <User className="w-4 h-4 mr-2" />
-              Personnel
-            </button>
-            <button
-              onClick={() => {
-                setLoginMode('admin');
-                setError('');
-                setShowManualLogin(false);
-              }}
-              className={`flex-1 flex items-center justify-center py-2 px-4 rounded-md transition-colors ${
-                loginMode === 'admin' 
-                  ? 'bg-white text-amber-800 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              Admin
-            </button>
-          </div>
-
-          {/* Connexion Personnel */}
-          {loginMode === 'user' && (
-            <div>
-              {!showManualLogin ? (
-                <>
-                  <div className="text-center mb-4">
-                    <p className="text-sm text-gray-600 mb-4">
-                      Connectez-vous avec votre compte Google académique UCA
-                    </p>
-                  </div>
-
-                  <div className="flex justify-center mb-4">
-                    <GoogleLogin
-                      onSuccess={handleGoogleSuccess}
-                      onError={handleGoogleFailure}
-                      text="signin_with"
-                      theme="outline"
-                      size="large"
-                      width="100%"
+            {/* Login Forms */}
+            {!showManualLogin && loginMode === 'user' ? (
+              <div className="space-y-6">
+                <p className="text-center text-sm text-stone-600 font-medium">
+                  Utilisez votre compte Google académique UCA
+                </p>
+                
+                <div className="flex justify-center">
+                  <div className="transform transition-all duration-300 hover:scale-105">
+                    <GoogleLogin 
+                      onSuccess={handleGoogleSuccess} 
+                      onError={handleGoogleFailure} 
+                      text="signin_with" 
+                      theme="outline" 
+                      size="large" 
                     />
                   </div>
-
-                  <div className="text-center">
-                    <button
-                      onClick={() => setShowManualLogin(true)}
-                      className="text-sm text-amber-800 hover:text-amber-900 underline"
-                    >
-                      Problème avec Google ? Connexion manuelle
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Connexion manuelle */}
-                  <form onSubmit={handleManualLogin}>
-                    <div className="mb-4">
-                      <label className="block text-amber-800 text-sm font-medium mb-2">
-                        Email académique UCA
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={handleEmailChange}
-                          className={`pl-10 pr-10 py-2 w-full border rounded-lg focus:outline-none focus:border-amber-800 ${
-                            email && !emailValidation.isValid 
-                              ? 'border-red-300 bg-red-50' 
-                              : email && emailValidation.isValid 
-                                ? 'border-green-300 bg-green-50' 
-                                : 'border-stone-300'
-                          }`}
-                          placeholder="nom.prenom@uca.ma"
-                          required
-                        />
-                        {email && (
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            {emailValidation.isValid ? (
-                              <CheckCircle className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <AlertCircle className="w-4 h-4 text-red-600" />
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {email && !emailValidation.isValid && (
-                        <p className="text-xs text-red-600 mt-1 flex items-center">
-                          <AlertCircle className="w-3 h-3 mr-1" />
-                          {emailValidation.error}
-                        </p>
-                      )}
-                      {email && emailValidation.isValid && (
-                        <p className="text-xs text-green-600 mt-1 flex items-center">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Email valide
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mb-6">
-                      <label className="block text-amber-800 text-sm font-medium mb-2">
-                        Mot de passe
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10 pr-4 py-2 w-full border border-stone-300 rounded-lg focus:outline-none focus:border-amber-800"
-                          placeholder="••••••••••"
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-600 mt-1">Minimum 6 caractères</p>
-                    </div>
-
-                    <div className="flex space-x-2">
-                      <button
-                        type="submit"
-                        className="flex-1 bg-amber-800 text-white py-2 px-4 rounded-lg hover:bg-amber-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!emailValidation.isValid || !email || !password}
-                      >
-                        Se connecter
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSignUp}
-                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!emailValidation.isValid || !email || !password}
-                      >
-                        S'inscrire
-                      </button>
-                    </div>
-                  </form>
-
-                  <div className="text-center mt-4">
-                    <button
-                      onClick={() => setShowManualLogin(false)}
-                      className="text-sm text-gray-600 hover:text-gray-800 underline"
-                    >
-                      Retour à la connexion Google
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Connexion Admin */}
-          {loginMode === 'admin' && (
-            <form onSubmit={handleAdminLogin}>
-              <div className="mb-4">
-                <label className="block text-amber-800 text-sm font-medium mb-2">
-                  Email
-                </label>
+                </div>
+                
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={handleEmailChange}
-                    className={`pl-10 pr-10 py-2 w-full border rounded-lg focus:outline-none focus:border-amber-800 ${
-                      email && !emailValidation.isValid 
-                        ? 'border-red-300 bg-red-50' 
-                        : email && emailValidation.isValid 
-                          ? 'border-green-300 bg-green-50' 
-                          : 'border-stone-300'
-                    }`}
-                    placeholder="admin@uca.ac.ma"
-                    required
-                  />
-                  {email && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      {emailValidation.isValid ? (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-red-600" />
-                      )}
-                    </div>
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-stone-200" />
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-4 bg-white text-stone-500">ou</span>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setShowManualLogin(true)} 
+                  className="w-full py-3 text-sm text-stone-600 hover:text-amber-600 font-medium transition-colors border-2 border-stone-200 hover:border-amber-300 rounded-xl">
+                  Connexion avec email et mot de passe
+                </button>
+              </div>
+            ) : (
+              <form 
+                onSubmit={loginMode === 'admin' ? handleAdminLogin : handleManualLogin} 
+                className="space-y-5">
+                
+                {/* Email */}
+                <div>
+                  <label className="block text-stone-800 text-sm font-semibold mb-2">
+                    Email académique UCA
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 w-5 h-5" />
+                    <input 
+                      type="email" 
+                      value={email} 
+                      onChange={handleEmailChange} 
+                      placeholder="nom.prenom@uca.ma" 
+                      required
+                      className={`input-focus w-full pl-12 pr-4 py-3.5 border-2 rounded-xl focus:outline-none font-medium text-stone-900 placeholder-stone-400 transition-all duration-300 ${
+                        email && !emailValidation.isValid 
+                          ? 'border-red-300 focus:border-red-400 bg-red-50/30' 
+                          : email && emailValidation.isValid 
+                            ? 'border-green-300 focus:border-green-400 bg-green-50/30' 
+                            : 'border-stone-200 focus:border-amber-400 bg-stone-50'
+                      }`} 
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-stone-800 text-sm font-semibold mb-2">
+                    Mot de passe
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 w-5 h-5" />
+                    <input 
+                      type={showPassword ? 'text' : 'password'} 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      placeholder="••••••••••" 
+                      required 
+                      minLength={6}
+                      className="input-focus w-full pl-12 pr-12 py-3.5 bg-stone-50 border-2 border-stone-200 rounded-xl focus:outline-none focus:border-amber-400 font-medium text-stone-900 placeholder-stone-400 transition-all duration-300" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)} 
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 transition-colors">
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    type="submit" 
+                    disabled={!emailValidation.isValid || !email || !password}
+                    className="btn-hover flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 shimmer-btn text-white py-3.5 px-6 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
+                    Se connecter
+                  </button>
+                  
+                  {loginMode === 'user' && (
+                    <button 
+                      type="button" 
+                      onClick={handleSignUp} 
+                      disabled={!emailValidation.isValid || !email || !password}
+                      className="btn-hover flex-1 bg-stone-800 text-white py-3.5 px-6 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none hover:bg-stone-900">
+                      S'inscrire
+                    </button>
                   )}
                 </div>
-                {email && !emailValidation.isValid && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center">
-                    <AlertCircle className="w-3 h-3 mr-1" />
-                    {emailValidation.error}
-                  </p>
+
+                {/* Back to Google */}
+                {showManualLogin && loginMode === 'user' && (
+                  <button 
+                    type="button"
+                    onClick={() => setShowManualLogin(false)} 
+                    className="w-full text-sm text-stone-500 hover:text-amber-600 font-medium transition-colors mt-2">
+                    ← Retour à Google Sign-In
+                  </button>
                 )}
-              </div>
+              </form>
+            )}
 
-              <div className="mb-6">
-                <label className="block text-amber-800 text-sm font-medium mb-2">
-                  Mot de passe
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-stone-300 rounded-lg focus:outline-none focus:border-amber-800"
-                    placeholder="••••••••••"
-                    required
-                  />
-                </div>
+            {/* Error */}
+            {error && (
+              <div className="mt-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-red-700 text-sm font-medium">{error}</p>
               </div>
+            )}
 
-              <button
-                type="submit"
-                className="w-full bg-amber-800 text-white py-2 px-4 rounded-lg hover:bg-amber-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!emailValidation.isValid || !email || !password}
-              >
-                Se connecter
-              </button>
-            </form>
-          )}
-
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" />
-                <p className="text-red-800 text-sm">{error}</p>
-              </div>
+            {/* Footer */}
+            <div className="mt-10 text-center">
+              <p className="text-xs text-stone-500">
+                © 2026 Université Cadi Ayyad. Tous droits réservés.
+              </p>
             </div>
-          )}
+
+          </div>
         </div>
+
       </div>
     </GoogleOAuthProvider>
   );

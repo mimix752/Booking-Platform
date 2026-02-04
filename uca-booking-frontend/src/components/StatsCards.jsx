@@ -3,40 +3,64 @@ import { Building2, Users, MapPin } from 'lucide-react';
 
 const StatsCards = ({ stats = { locaux: 24, places: 1850, sites: 4 } }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-      {/* Card 1 - Locaux */}
-      <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent 
-                      hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-400/50 
-                      transform transition-all duration-500 hover:-translate-y-2 hover:scale-105 animate-pulse-slow">
-        <div className="flex items-center justify-center w-14 h-14 bg-blue-100 rounded-xl mx-auto mb-4">
-          <Building2 className="w-7 h-7 text-blue-600" />
-        </div>
-        <div className="text-4xl font-bold text-gray-900 mb-2">{stats.locaux}</div>
-        <div className="text-gray-600 font-medium">Locaux disponibles</div>
-      </div>
+    <>
+      <style>{`
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-12px);
+          }
+        }
 
-      {/* Card 2 - Places */}
-      <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent 
-                      hover:border-purple-400 hover:shadow-2xl hover:shadow-purple-400/50 
-                      transform transition-all duration-500 hover:-translate-y-2 hover:scale-105 animate-pulse-slow">
-        <div className="flex items-center justify-center w-14 h-14 bg-purple-100 rounded-xl mx-auto mb-4">
-          <Users className="w-7 h-7 text-purple-600" />
-        </div>
-        <div className="text-4xl font-bold text-gray-900 mb-2">{stats.places}</div>
-        <div className="text-gray-600 font-medium">Places disponibles</div>
-      </div>
+        .card-float {
+          animation: float 5s ease-in-out infinite;
+        }
 
-      {/* Card 3 - Sites */}
-      <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-transparent 
-                      hover:border-green-400 hover:shadow-2xl hover:shadow-green-400/50 
-                      transform transition-all duration-500 hover:-translate-y-2 hover:scale-105 animate-pulse-slow">
-        <div className="flex items-center justify-center w-14 h-14 bg-green-100 rounded-xl mx-auto mb-4">
-          <MapPin className="w-7 h-7 text-green-600" />
+        .card-float:hover {
+          animation-play-state: paused;
+          transform: translateY(0px) scale(1.05);
+        }
+      `}</style>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10">
+        
+        {/* Card 1 - Locaux */}
+        <div className="card-float bg-white rounded-xl p-4 shadow-md border-2 border-transparent 
+                        hover:border-blue-400 hover:shadow-lg hover:shadow-blue-400/40 
+                        transition-all duration-300">
+          <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg mx-auto mb-3">
+            <Building2 className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 mb-1">{stats.locaux}</div>
+          <div className="text-sm text-gray-600 font-medium">Locaux disponibles</div>
         </div>
-        <div className="text-4xl font-bold text-gray-900 mb-2">{stats.sites}</div>
-        <div className="text-gray-600 font-medium">Sites universitaires</div>
+
+        {/* Card 2 - Places */}
+        <div className="card-float bg-white rounded-xl p-4 shadow-md border-2 border-transparent 
+                        hover:border-purple-400 hover:shadow-lg hover:shadow-purple-400/40 
+                        transition-all duration-300">
+          <div className="flex items-center justify-center w-10 h-10 bg-purple-100 rounded-lg mx-auto mb-3">
+            <Users className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 mb-1">{stats.places}</div>
+          <div className="text-sm text-gray-600 font-medium">Places disponibles</div>
+        </div>
+
+        {/* Card 3 - Sites */}
+        <div className="card-float bg-white rounded-xl p-4 shadow-md border-2 border-transparent 
+                        hover:border-green-400 hover:shadow-lg hover:shadow-green-400/40 
+                        transition-all duration-300">
+          <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-lg mx-auto mb-3">
+            <MapPin className="w-5 h-5 text-green-600" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 mb-1">{stats.sites}</div>
+          <div className="text-sm text-gray-600 font-medium">Sites universitaires</div>
+        </div>
+
       </div>
-    </div>
+    </>
   );
 };
 
