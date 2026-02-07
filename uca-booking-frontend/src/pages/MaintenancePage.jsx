@@ -1,83 +1,62 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
-import { Wrench, Plus, Edit, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
-import { locaux as initialLocaux } from '../data/locaux';
+import { Wrench, AlertCircle, CheckCircle } from 'lucide-react';
+import { getAdminLocaux, setLocalMaintenance } from '../services/adminLocauxService';
 
 const MaintenancePage = () => {
-  const [locaux, setLocaux] = useState(initialLocaux.map(local => ({
-    ...local,
-    enMaintenance: false,
-    dateMaintenance: null,
-    motifMaintenance: '',
-  })));
+  const [locaux, setLocaux] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const [showModal, setShowModal] = useState(false);
-  const [selectedLocal, setSelectedLocal] = useState(null);
-  const [maintenanceForm, setMaintenanceForm] = useState({
-    dateDebut: '',
-    dateFin: '',
-    motif: '',
-    description: '',
-  });
-
-  const handleOpenModal = (local) => {
-    setSelectedLocal(local);
-    setShowModal(true);
-    setMaintenanceForm({
-      dateDebut: '',
-      dateFin: '',
-      motif: '',
-      description: '',
-    });
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedLocal(null);
-  };
-
-  const handleMettreEnMaintenance = () => {
-    if (!maintenanceForm.dateDebut || !maintenanceForm.dateFin || !maintenanceForm.motif) {
-      alert('Veuillez remplir tous les champs obligatoires');
-      return;
+  const loadLocaux = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await getAdminLocaux();
+      const data = res?.data || [];
+      const mapped = data.map((l) => ({
+        id: l.id,
+        nom: l.nom,
+        capacite: l.capacite,
+        site: l.site?.nom || '',
+        equipements: Array.isArray(l.equipements) ? l.equipements : [],
+        statut: l.statut,
+        disponible: l.statut === 'disponible',
+        enMaintenance: l.statut === 'maintenance',
+      }));
+      setLocaux(mapped);
+    } catch (e) {
+      setError(e?.message || 'Erreur lors du chargement des locaux');
+    } finally {
+      setLoading(false);
     }
-
-    setLocaux(locaux.map(local => 
-      local.id === selectedLocal.id 
-        ? { 
-            ...local, 
-            enMaintenance: true, 
-            disponible: false,
-            dateMaintenance: {
-              debut: maintenanceForm.dateDebut,
-              fin: maintenanceForm.dateFin,
-            },
-            motifMaintenance: maintenanceForm.motif,
-            descriptionMaintenance: maintenanceForm.description,
-          }
-        : local
-    ));
-    handleCloseModal();
   };
 
-  const handleRetirerMaintenance = (localId) => {
-    setLocaux(locaux.map(local => 
-      local.id === localId 
-        ? { 
-            ...local, 
-            enMaintenance: false, 
-            disponible: true,
-            dateMaintenance: null,
-            motifMaintenance: '',
-            descriptionMaintenance: '',
-          }
-        : local
-    ));
+  useEffect(() => {
+    loadLocaux();
+  }, []);
+
+  const handleMettreEnMaintenance = async (local) => {
+    try {
+      await setLocalMaintenance(local.id, true);
+      await loadLocaux();
+    } catch (e) {
+      alert(e?.message || 'Erreur lors de la mise en maintenance');
+    }
   };
 
-  const locauxEnMaintenance = locaux.filter(l => l.enMaintenance);
-  const locauxDisponibles = locaux.filter(l => !l.enMaintenance && l.disponible);
-  const locauxIndisponibles = locaux.filter(l => !l.enMaintenance && !l.disponible);
+  const handleRetirerMaintenance = async (localId) => {
+    try {
+      await setLocalMaintenance(localId, false);
+      await loadLocaux();
+    } catch (e) {
+      alert(e?.message || 'Erreur lors du retrait de maintenance');
+    }
+  };
+
+  const locauxEnMaintenance = useMemo(() => locaux.filter(l => l.enMaintenance), [locaux]);
+  const locauxDisponibles = useMemo(() => locaux.filter(l => !l.enMaintenance && l.disponible), [locaux]);
+  const locauxIndisponibles = useMemo(() => locaux.filter(l => !l.enMaintenance && !l.disponible), [locaux]);
 
   return (
     <AdminLayout>
@@ -86,6 +65,16 @@ const MaintenancePage = () => {
           <h2 className="text-2xl font-bold text-amber-800 mb-2"> Gestion de la Maintenance</h2>
           <p className="text-gray-600">Gérez l'état de maintenance des locaux</p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+            {error}
+          </div>
+        )}
+
+        {loading && (
+          <div className="mb-6 text-sm text-gray-500">Chargement…</div>
+        )}
 
         {/* Statistiques */}
         <div className="grid grid-cols-3 gap-4 mb-8">
@@ -131,19 +120,6 @@ const MaintenancePage = () => {
                       <p className="text-sm text-gray-600 mt-1">
                         Site: {local.site} | Capacité: {local.capacite} personnes
                       </p>
-                      <div className="mt-2 space-y-1">
-                        <p className="text-sm text-yellow-800">
-                          <span className="font-medium">Période:</span> {local.dateMaintenance?.debut} au {local.dateMaintenance?.fin}
-                        </p>
-                        <p className="text-sm text-yellow-800">
-                          <span className="font-medium">Motif:</span> {local.motifMaintenance}
-                        </p>
-                        {local.descriptionMaintenance && (
-                          <p className="text-sm text-yellow-700">
-                            <span className="font-medium">Description:</span> {local.descriptionMaintenance}
-                          </p>
-                        )}
-                      </div>
                     </div>
                     <div className="flex space-x-2">
                       <button
@@ -168,10 +144,10 @@ const MaintenancePage = () => {
               <div
                 key={local.id}
                 className={`border rounded-lg p-4 ${
-                  local.enMaintenance 
-                    ? 'border-yellow-200 bg-yellow-50' 
-                    : local.disponible 
-                    ? 'border-green-200 bg-green-50' 
+                  local.enMaintenance
+                    ? 'border-yellow-200 bg-yellow-50'
+                    : local.disponible
+                    ? 'border-green-200 bg-green-50'
                     : 'border-red-200 bg-red-50'
                 }`}
               >
@@ -209,7 +185,7 @@ const MaintenancePage = () => {
                   <div>
                     {!local.enMaintenance && (
                       <button
-                        onClick={() => handleOpenModal(local)}
+                        onClick={() => handleMettreEnMaintenance(local)}
                         className="p-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors"
                         title="Mettre en maintenance"
                       >
@@ -218,100 +194,15 @@ const MaintenancePage = () => {
                     )}
                   </div>
                 </div>
+
               </div>
             ))}
           </div>
         </div>
       </div>
-
-      {/* Modal de maintenance */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Mettre en maintenance: {selectedLocal?.nom}
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date de début *
-                </label>
-                <input
-                  type="date"
-                  value={maintenanceForm.dateDebut}
-                  onChange={(e) => setMaintenanceForm({ ...maintenanceForm, dateDebut: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date de fin *
-                </label>
-                <input
-                  type="date"
-                  value={maintenanceForm.dateFin}
-                  onChange={(e) => setMaintenanceForm({ ...maintenanceForm, dateFin: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Motif *
-                </label>
-                <select
-                  value={maintenanceForm.motif}
-                  onChange={(e) => setMaintenanceForm({ ...maintenanceForm, motif: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  required
-                >
-                  <option value="">Sélectionner un motif</option>
-                  <option value="Réparation">Réparation</option>
-                  <option value="Nettoyage">Nettoyage approfondi</option>
-                  <option value="Rénovation">Rénovation</option>
-                  <option value="Inspection">Inspection technique</option>
-                  <option value="Équipement">Installation d'équipement</option>
-                  <option value="Autre">Autre</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description (optionnel)
-                </label>
-                <textarea
-                  value={maintenanceForm.description}
-                  onChange={(e) => setMaintenanceForm({ ...maintenanceForm, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  rows="3"
-                  placeholder="Détails supplémentaires..."
-                />
-              </div>
-            </div>
-
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={handleMettreEnMaintenance}
-                className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-              >
-                Confirmer
-              </button>
-              <button
-                onClick={handleCloseModal}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </AdminLayout>
   );
 };
 
 export default MaintenancePage;
+

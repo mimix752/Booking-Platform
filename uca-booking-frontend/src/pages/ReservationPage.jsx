@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, Users, MapPin, Clock, ArrowLeft, Check } from 'lucide-react';
-import { locaux } from '../data/locaux';
-import { sites } from '../data/sites';
+import { Users, MapPin, Clock, ArrowLeft, Check } from 'lucide-react';
+import { createReservation } from '../services/reservationService';
+import { api } from '../utils/apiClient';
 
 const ReservationPage = () => {
   const { localId } = useParams();
@@ -11,6 +11,7 @@ const ReservationPage = () => {
   const { user, isAuthenticated } = useAuth();
 
   const [local, setLocal] = useState(null);
+  const [loadingLocal, setLoadingLocal] = useState(true);
   const [formData, setFormData] = useState({
     fonction: '',
     natureEvenement: '',
@@ -32,13 +33,27 @@ const ReservationPage = () => {
       return;
     }
 
-    const foundLocal = locaux.find(l => l.id === parseInt(localId));
-    if (foundLocal) {
-      setLocal(foundLocal);
-    } else {
-      navigate('/');
-    }
+    const loadLocal = async () => {
+      setLoadingLocal(true);
+      try {
+        const { data } = await api.get(`/locaux/${localId}`);
+        if (!data?.success) throw new Error(data?.message || 'Erreur chargement local');
+        setLocal(data.data);
+      } catch (e) {
+        console.error(e);
+        navigate('/');
+      } finally {
+        setLoadingLocal(false);
+      }
+    };
+
+    loadLocal();
   }, [localId, isAuthenticated, navigate]);
+
+  const siteName = useMemo(() => {
+    // Backend renvoie local.site.nom (relation) si loaded
+    return local?.site?.nom || local?.site?.name || local?.site?.site_id || '';
+  }, [local]);
 
   const fonctions = [
     'Professeur',
@@ -70,26 +85,37 @@ const ReservationPage = () => {
     }));
   };
 
-  const handleSubmitReservation = () => {
-    // Simuler l'envoi de la réservation
-    const reservation = {
-      id: Date.now(),
-      localId: parseInt(localId),
-      userId: user.email,
-      userName: user.name,
-      ...formData,
-      status: formData.isMultiJour ? 'en_attente' : 'confirmee',
-      dateCreation: new Date().toISOString(),
-      site: local.site
-    };
+  const handleSubmitReservation = async () => {
+    try {
+      const motif = (formData.motif || '').trim();
+      if (motif.length < 10) {
+        alert('Le motif doit contenir au moins 10 caractères.');
+        return;
+      }
 
-    // Sauvegarder la réservation (simulation)
-    const existingReservations = JSON.parse(localStorage.getItem('reservations') || '[]');
-    existingReservations.push(reservation);
-    localStorage.setItem('reservations', JSON.stringify(existingReservations));
+      // Mapping Front -> API Laravel
+      const payload = {
+        local_id: parseInt(localId, 10),
+        date_debut: formData.dateDebut,
+        date_fin: formData.dateFin,
+        creneau:
+          formData.creneau === 'journee'
+            ? 'journee-complete'
+            : formData.creneau, // matin | apres-midi | journee-complete
+        nature_evenement: formData.natureEvenement,
+        participants_estimes: Number(formData.participants),
+        motif,
+      };
 
-    setReservationStatus(reservation.status);
-    setShowModal(true);
+      const result = await createReservation(payload);
+
+      // Backend renvoie: { id, statut, needsValidation }
+      setReservationStatus(result?.statut);
+      setShowModal(true);
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'Erreur lors de la réservation');
+    }
   };
 
   const nextStep = () => {
@@ -100,7 +126,7 @@ const ReservationPage = () => {
     if (step > 1) setStep(step - 1);
   };
 
-  if (!local) {
+  if (loadingLocal || !local) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="text-center">
@@ -110,8 +136,6 @@ const ReservationPage = () => {
       </div>
     );
   }
-
-  const siteName = sites.find(s => s.id === local.site)?.name;
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -172,7 +196,7 @@ const ReservationPage = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
-                {local.equipements.map((eq, idx) => (
+                {(local.equipements || []).map((eq, idx) => (
                   <span key={idx} className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full">
                     {eq}
                   </span>
@@ -419,7 +443,7 @@ const ReservationPage = () => {
             ) : (
               <button
                 onClick={handleSubmitReservation}
-                disabled={!formData.motif.trim()}
+                disabled={formData.motif.trim().length < 10}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirmer la réservation

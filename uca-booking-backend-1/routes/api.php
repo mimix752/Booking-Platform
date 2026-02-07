@@ -18,12 +18,22 @@ use App\Http\Controllers\StatsController;
 
 // Routes publiques
 Route::prefix('auth')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
     Route::post('/google-login', [AuthController::class, 'googleLogin']);
 });
 
+// Données publiques (lecture)
+Route::get('/sites', [SiteController::class, 'index']);
+Route::get('/sites/{id}', [SiteController::class, 'show']);
+Route::get('/sites/{id}/locaux', [SiteController::class, 'getLocaux']);
+
+Route::get('/locaux', [LocalController::class, 'index']);
+Route::get('/locaux/{id}', [LocalController::class, 'show']);
+
 // Routes protégées (nécessitent authentification)
 Route::middleware(['auth:sanctum'])->group(function () {
-    
+
     // Auth
     Route::prefix('auth')->group(function () {
         Route::get('/verify-token', [AuthController::class, 'verifyToken']);
@@ -31,17 +41,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/refresh-token', [AuthController::class, 'refreshToken']);
     });
 
-    // Sites
-    Route::prefix('sites')->group(function () {
-        Route::get('/', [SiteController::class, 'index']);
-        Route::get('/{id}', [SiteController::class, 'show']);
-        Route::get('/{id}/locaux', [SiteController::class, 'getLocaux']);
-    });
-
-    // Locaux
+    // Locaux (actions protégées)
     Route::prefix('locaux')->group(function () {
-        Route::get('/', [LocalController::class, 'index']);
-        Route::get('/{id}', [LocalController::class, 'show']);
         Route::post('/{id}/check-availability', [LocalController::class, 'checkAvailability']);
         Route::get('/{id}/calendar', [LocalController::class, 'getCalendar']);
     });
@@ -62,7 +63,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Routes Admin (nécessitent droits admin)
     Route::middleware(['check.admin'])->prefix('admin')->group(function () {
-        
+
         // Gestion des sites
         Route::prefix('sites')->group(function () {
             Route::post('/', [SiteController::class, 'store']);
@@ -81,6 +82,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Gestion des réservations
         Route::prefix('reservations')->group(function () {
             Route::get('/', [AdminController::class, 'getAllReservations']);
+            Route::get('/pending', [AdminController::class, 'getPendingReservations']);
             Route::post('/create', [AdminController::class, 'createAdminReservation']);
             Route::post('/{id}/validate', [AdminController::class, 'validateReservation']);
             Route::post('/{id}/refuse', [AdminController::class, 'refuseReservation']);

@@ -1,8 +1,7 @@
 import React from 'react';
 import { Search } from 'lucide-react';
-import { sites } from '../data/sites';
 
-const Filters = ({ searchTerm, setSearchTerm, selectedSite, setSelectedSite }) => {
+const Filters = ({ searchTerm, setSearchTerm, selectedSite, setSelectedSite, sites = [] }) => {
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
       <div className="flex flex-col md:flex-row gap-4">
@@ -32,7 +31,7 @@ const Filters = ({ searchTerm, setSearchTerm, selectedSite, setSelectedSite }) =
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <SiteIcon className="w-4 h-4" />
+                {SiteIcon ? <SiteIcon className="w-4 h-4" /> : null}
                 <span className="text-sm">{site.name}</span>
               </button>
             );

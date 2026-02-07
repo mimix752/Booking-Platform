@@ -1,18 +1,60 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
-import { reservations } from '../data/reservations';
-import { locaux } from '../data/locaux';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getAdminLocaux } from '../services/adminLocauxService';
+import { getAdminReservations } from '../services/adminReservationService';
+import { getLocalCalendar } from '../services/adminLocauxCalendarService';
 
 const CalendrierPage = () => {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 27)); // 27 janvier 2026
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedLocal, setSelectedLocal] = useState('all');
-  const [viewMode, setViewMode] = useState('month'); // month, week, day
+  const [viewMode, setViewMode] = useState('month'); // month, week
+  const [locaux, setLocaux] = useState([]);
+  const [reservations, setReservations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+  const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
                       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
   
   const daysOfWeek = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+  const loadLocaux = async () => {
+    const res = await getAdminLocaux();
+    const data = res?.data || [];
+    setLocaux(data);
+  };
+
+  const loadReservations = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (selectedLocal === 'all') {
+        const res = await getAdminReservations({ limit: 200 });
+        setReservations(res?.data || []);
+      } else {
+        const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const res = await getLocalCalendar(selectedLocal, {
+          start_date: start.toISOString().slice(0, 10),
+          end_date: end.toISOString().slice(0, 10),
+        });
+        setReservations(res?.data || []);
+      }
+    } catch (e) {
+      setError(e?.message || 'Erreur lors du chargement du calendrier');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLocaux().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadReservations();
+  }, [selectedLocal, currentDate]);
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -25,12 +67,22 @@ const CalendrierPage = () => {
     return { daysInMonth, startingDayOfWeek };
   };
 
+  const normalizedReservations = useMemo(() => {
+    return (reservations || []).map((r) => ({
+      id: r.id,
+      user: r.user?.name || '',
+      local: r.local?.nom || '',
+      dateDebut: r.date_debut,
+      dateFin: r.date_fin,
+      status: r.statut,
+      creneau: r.creneau,
+    }));
+  }, [reservations]);
+
   const getReservationsForDay = (day) => {
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return reservations.filter(r => {
-      const matchDate = r.date === dateStr || (r.dateDebut <= dateStr && r.dateFin >= dateStr);
-      const matchLocal = selectedLocal === 'all' || r.local === selectedLocal;
-      return matchDate && matchLocal;
+    return normalizedReservations.filter(r => {
+      return (r.dateDebut <= dateStr && r.dateFin >= dateStr);
     });
   };
 
@@ -43,18 +95,24 @@ const CalendrierPage = () => {
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date(2026, 0, 27));
+    setCurrentDate(new Date());
   };
 
   const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'pending': return 'bg-yellow-100 border-yellow-400 text-yellow-800';
-      case 'confirmed': return 'bg-green-100 border-green-400 text-green-800';
-      case 'refused': return 'bg-red-100 border-red-400 text-red-800';
-      case 'cancelled': return 'bg-gray-100 border-gray-400 text-gray-800';
-      default: return 'bg-gray-100 border-gray-400 text-gray-800';
+    switch (status) {
+      case 'en_attente':
+        return 'bg-yellow-100 border-yellow-400 text-yellow-800';
+      case 'confirmee':
+        return 'bg-green-100 border-green-400 text-green-800';
+      case 'refusee':
+        return 'bg-red-100 border-red-400 text-red-800';
+      case 'annulee_admin':
+      case 'annulee_utilisateur':
+        return 'bg-gray-100 border-gray-400 text-gray-800';
+      default:
+        return 'bg-gray-100 border-gray-400 text-gray-800';
     }
   };
 
@@ -99,8 +157,10 @@ const CalendrierPage = () => {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
             >
               <option value="all">Tous les locaux</option>
-              {locaux.map(local => (
-                <option key={local.id} value={local.nom}>{local.nom}</option>
+              {locaux.map((local) => (
+                <option key={local.id} value={String(local.id)}>
+                  {local.nom}
+                </option>
               ))}
             </select>
 
@@ -124,6 +184,14 @@ const CalendrierPage = () => {
             </div>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">{error}</div>
+        )}
+
+        {loading && (
+          <div className="mb-4 text-sm text-gray-500">Chargement…</div>
+        )}
 
         {/* Légende */}
         <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
@@ -167,7 +235,11 @@ const CalendrierPage = () => {
             {[...Array(daysInMonth)].map((_, index) => {
               const day = index + 1;
               const dayReservations = getReservationsForDay(day);
-              const isToday = day === 27 && currentDate.getMonth() === 0 && currentDate.getFullYear() === 2026;
+              const today = new Date();
+              const isToday =
+                day === today.getDate() &&
+                currentDate.getMonth() === today.getMonth() &&
+                currentDate.getFullYear() === today.getFullYear();
 
               return (
                 <div
@@ -176,22 +248,24 @@ const CalendrierPage = () => {
                     isToday ? 'bg-amber-50' : 'bg-white'
                   }`}
                 >
-                  <div className={`text-sm font-semibold mb-2 ${
-                    isToday ? 'text-amber-800' : 'text-gray-700'
-                  }`}>
+                  <div
+                    className={`text-sm font-semibold mb-2 ${
+                      isToday ? 'text-amber-800' : 'text-gray-700'
+                    }`}
+                  >
                     {day}
                     {isToday && <span className="ml-2 text-xs text-amber-600">(Aujourd'hui)</span>}
                   </div>
-                  
+
                   <div className="space-y-1">
-                    {dayReservations.slice(0, 3).map((reservation, idx) => (
+                    {dayReservations.slice(0, 3).map((reservation) => (
                       <div
-                        key={idx}
+                        key={reservation.id}
                         className={`text-xs p-1 rounded border-l-2 ${getStatusColor(reservation.status)}`}
-                        title={`${reservation.local} - ${reservation.user} - ${reservation.heureDebut}`}
+                        title={`${reservation.local} - ${reservation.user} - ${reservation.creneau}`}
                       >
-                        <p className="font-medium truncate">{reservation.local}</p>
-                        <p className="truncate text-[10px]">{reservation.heureDebut}</p>
+                        <p className="font-medium truncate">{reservation.local || 'Local'}</p>
+                        <p className="truncate text-[10px]">{reservation.creneau}</p>
                       </div>
                     ))}
                     {dayReservations.length > 3 && (
@@ -210,25 +284,27 @@ const CalendrierPage = () => {
         <div className="grid grid-cols-4 gap-4 mt-6">
           <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
             <p className="text-2xl font-bold text-yellow-800">
-              {reservations.filter(r => r.status === 'pending').length}
+              {normalizedReservations.filter((r) => r.status === 'en_attente').length}
             </p>
             <p className="text-sm text-yellow-700">En attente</p>
           </div>
           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
             <p className="text-2xl font-bold text-green-800">
-              {reservations.filter(r => r.status === 'confirmed').length}
+              {normalizedReservations.filter((r) => r.status === 'confirmee').length}
             </p>
             <p className="text-sm text-green-700">Confirmées</p>
           </div>
           <div className="p-4 bg-red-50 rounded-lg border border-red-200">
             <p className="text-2xl font-bold text-red-800">
-              {reservations.filter(r => r.status === 'refused').length}
+              {normalizedReservations.filter((r) => r.status === 'refusee').length}
             </p>
             <p className="text-sm text-red-700">Refusées</p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-2xl font-bold text-gray-800">
-              {reservations.filter(r => r.status === 'cancelled').length}
+              {normalizedReservations.filter(
+                (r) => r.status === 'annulee_admin' || r.status === 'annulee_utilisateur'
+              ).length}
             </p>
             <p className="text-sm text-gray-700">Annulées</p>
           </div>

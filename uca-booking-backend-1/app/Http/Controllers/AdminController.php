@@ -77,6 +77,61 @@ class AdminController extends Controller
     }
 
     /**
+     * Récupérer les réservations en attente (Admin)
+     */
+    public function getPendingReservations(Request $request)
+    {
+        try {
+            $perPage = $request->get('limit', 20);
+
+            $query = Reservation::with(['user', 'local.site', 'validator'])
+                ->pending();
+
+            // Filtres (mêmes que getAllReservations, sans permettre status différent)
+            if ($request->has('site_id')) {
+                $query->whereHas('local', function ($q) use ($request) {
+                    $q->where('site_id', $request->site_id);
+                });
+            }
+
+            if ($request->has('local_id')) {
+                $query->where('local_id', $request->local_id);
+            }
+
+            if ($request->has('user_id')) {
+                $query->where('user_id', $request->user_id);
+            }
+
+            if ($request->has('date_from')) {
+                $query->where('date_debut', '>=', $request->date_from);
+            }
+
+            if ($request->has('date_to')) {
+                $query->where('date_fin', '<=', $request->date_to);
+            }
+
+            $reservations = $query->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $reservations->items(),
+                'pagination' => [
+                    'total' => $reservations->total(),
+                    'page' => $reservations->currentPage(),
+                    'limit' => $reservations->perPage(),
+                    'totalPages' => $reservations->lastPage()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des réservations en attente'
+            ], 500);
+        }
+    }
+
+    /**
      * Valider une réservation
      */
     public function validateReservation(Request $request, $id)
@@ -122,8 +177,15 @@ class AdminController extends Controller
                 'commentaire_admin' => $request->commentaire_admin
             ]);
 
-            // Envoyer l'email de confirmation
-            Mail::to($reservation->user->email)->send(new ReservationConfirmed($reservation));
+            // Envoyer l'email de confirmation (ne doit pas casser l'API)
+            try {
+                Mail::to($reservation->user->email)->send(new ReservationConfirmed($reservation));
+            } catch (\Throwable $mailException) {
+                \Log::warning('Email confirmation reservation failed', [
+                    'reservation_id' => $reservation->id,
+                    'error' => $mailException->getMessage(),
+                ]);
+            }
 
             // Log de l'action
             Log::create([
@@ -185,8 +247,15 @@ class AdminController extends Controller
                 'commentaire_admin' => $request->commentaire_admin
             ]);
 
-            // Envoyer l'email de refus
-            Mail::to($reservation->user->email)->send(new ReservationRefused($reservation));
+            // Envoyer l'email de refus (ne doit pas casser l'API)
+            try {
+                Mail::to($reservation->user->email)->send(new ReservationRefused($reservation));
+            } catch (\Throwable $mailException) {
+                \Log::warning('Email refusal reservation failed', [
+                    'reservation_id' => $reservation->id,
+                    'error' => $mailException->getMessage(),
+                ]);
+            }
 
             // Log de l'action
             Log::create([
@@ -249,8 +318,15 @@ class AdminController extends Controller
                 'commentaire_admin' => $request->cancellation_reason
             ]);
 
-            // Envoyer l'email d'annulation
-            Mail::to($reservation->user->email)->send(new ReservationCancelled($reservation));
+            // Envoyer l'email d'annulation (ne doit pas casser l'API)
+            try {
+                Mail::to($reservation->user->email)->send(new ReservationCancelled($reservation));
+            } catch (\Throwable $mailException) {
+                \Log::warning('Email cancellation reservation failed', [
+                    'reservation_id' => $reservation->id,
+                    'error' => $mailException->getMessage(),
+                ]);
+            }
 
             // Log de l'action
             Log::create([
@@ -584,3 +660,4 @@ class AdminController extends Controller
         }
     }
 }
+

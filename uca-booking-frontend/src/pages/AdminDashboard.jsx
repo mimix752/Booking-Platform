@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
 import { Plus, Wrench, FileText, TrendingUp, Users, Calendar, Clock, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
+import { getDashboardKPIs } from '../services/adminStatsService';
+import { getAdminReservations, validateAdminReservation, refuseAdminReservation } from '../services/adminReservationService';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -12,6 +14,8 @@ const AdminDashboard = () => {
     en_attente: 0,
     refusees: 0
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [showAddLocalModal, setShowAddLocalModal] = useState(false);
   const [newLocal, setNewLocal] = useState({
     nom: '',
@@ -25,18 +29,49 @@ const AdminDashboard = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const allReservations = JSON.parse(localStorage.getItem('reservations') || '[]');
-    setReservations(allReservations);
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [kpisRes, pendingRes] = await Promise.all([
+        getDashboardKPIs(),
+        // On prend les dernières demandes en attente (côté backend: statut=en_attente)
+        getAdminReservations({ pending_only: 'true', limit: 50 })
+      ]);
 
-    // Calculer les statistiques
-    const stats = {
-      total: allReservations.length,
-      confirmees: allReservations.filter(r => r.status === 'confirmee').length,
-      en_attente: allReservations.filter(r => r.status === 'en_attente').length,
-      refusees: allReservations.filter(r => r.status === 'refusee').length
-    };
-    setStats(stats);
+      const kpis = kpisRes?.data || {};
+      setStats({
+        total: kpis.totalReservations ?? 0,
+        confirmees: kpis.confirmedReservations ?? 0,
+        en_attente: kpis.pendingReservations ?? 0,
+        refusees: 0,
+        cancelled: kpis.cancelledReservations ?? 0,
+        totalLocaux: kpis.totalLocaux ?? 0,
+        totalUsers: kpis.totalUsers ?? 0,
+        occupancyRate: kpis.occupancyRate ?? 0,
+      });
+
+      const pending = pendingRes?.data || [];
+      const normalized = pending.map((r) => ({
+        id: r.id,
+        status: r.statut,
+        userName: r.user?.name || '',
+        userEmail: r.user?.email || '',
+        local: r.local?.nom || '',
+        site: r.local?.site?.nom || '',
+        dateDebut: r.date_debut,
+        dateFin: r.date_fin,
+        creneau: r.creneau,
+        participants: r.participants_estimes,
+        motif: r.motif || '',
+        dateCreation: r.created_at,
+      }));
+      setReservations(normalized);
+    } catch (e) {
+      setError(e?.message || 'Erreur lors du chargement du dashboard');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const pendingReservations = reservations
@@ -44,15 +79,19 @@ const AdminDashboard = () => {
     .sort((a, b) => new Date(b.dateCreation) - new Date(a.dateCreation))
     .slice(0, 5);
 
-  const handleStatusChange = (reservationId, newStatus) => {
-    const updatedReservations = reservations.map(res =>
-      res.id === reservationId
-        ? { ...res, status: newStatus, lastUpdated: new Date().toISOString() }
-        : res
-    );
-
-    localStorage.setItem('reservations', JSON.stringify(updatedReservations));
-    loadData(); // Recharger les données
+  const handleStatusChange = async (reservationId, newStatus) => {
+    try {
+      if (newStatus === 'confirmee') {
+        await validateAdminReservation(reservationId);
+      } else if (newStatus === 'refusee') {
+        // Le backend exige un commentaire_admin min:10
+        const commentaire = window.prompt('Motif du refus (min 10 caractères) :', '') || '';
+        await refuseAdminReservation(reservationId, commentaire);
+      }
+      await loadData();
+    } catch (e) {
+      alert(e?.message || 'Erreur lors de la mise à jour du statut');
+    }
   };
 
   const exportToCSV = () => {
@@ -99,35 +138,7 @@ const AdminDashboard = () => {
   };
 
   const handleAddLocal = () => {
-    if (!newLocal.nom || !newLocal.capacite) {
-      alert('Veuillez remplir tous les champs obligatoires (Nom et Capacité)');
-      return;
-    }
-
-    const locaux = JSON.parse(localStorage.getItem('locaux') || '[]');
-    const newLocalData = {
-      id: Date.now().toString(),
-      ...newLocal,
-      capacite: parseInt(newLocal.capacite),
-      equipements: newLocal.equipements.split(',').map(e => e.trim()).filter(e => e),
-      disponible: true,
-      dateAjout: new Date().toISOString()
-    };
-
-    locaux.push(newLocalData);
-    localStorage.setItem('locaux', JSON.stringify(locaux));
-    
-    // Réinitialiser le formulaire
-    setNewLocal({
-      nom: '',
-      type: 'salle',
-      capacite: '',
-      equipements: '',
-      description: ''
-    });
-    setShowAddLocalModal(false);
-    
-    alert('Local ajouté avec succès !');
+    alert('Ajout de local: à brancher sur le backend (endpoint POST /api/admin/locaux).');
   };
 
   return (
@@ -135,6 +146,12 @@ const AdminDashboard = () => {
       {/* Statistiques Section */}
       <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
         <h2 className="text-3xl font-bold text-amber-800 mb-8">Tableau de bord</h2>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+            {error}
+          </div>
+        )}
 
         {/* Global Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
@@ -167,7 +184,7 @@ const AdminDashboard = () => {
                   <span className="font-medium">Taux d'occupation</span>
                 </div>
                 <span className="text-lg font-bold text-amber-800">
-                  {stats.total > 0 ? Math.round((stats.confirmees / stats.total) * 100) : 0}%
+                  {typeof stats.occupancyRate === 'number' ? Math.round(stats.occupancyRate) : 0}%
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
@@ -213,6 +230,10 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+
+        {loading && (
+          <div className="mt-6 text-sm text-gray-500">Chargement…</div>
+        )}
       </div>
 
       {/* Demandes en attente */}
@@ -448,3 +469,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+

@@ -11,9 +11,11 @@ export const CONFIG = {
   ENVIRONMENT: 'development', // 'development' ou 'production'
 
   // URLs de l'API (à configurer selon l'environnement)
-  API_BASE_URL: process.env.NODE_ENV === 'production'
-    ? 'https://api.uca-booking.ma'
-    : 'http://localhost:3000/api',
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || (
+    process.env.NODE_ENV === 'production'
+      ? 'https://api.uca-booking.ma'
+      : 'http://localhost:8000/api'
+  ),
 
   // Configuration des emails
   NOTIFICATION_SETTINGS: {

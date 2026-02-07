@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../components/AdminLayout';
-import { Search, Filter, Calendar, MapPin, Users, Clock, CheckCircle, XCircle, AlertCircle, Eye, Edit, Trash2 } from 'lucide-react';
-import { sites } from '../data/sites';
-import { locaux } from '../data/locaux';
+import { Search, Calendar, CheckCircle, XCircle, AlertCircle, Eye, Trash2 } from 'lucide-react';
+import { getAdminReservations, validateAdminReservation, refuseAdminReservation } from '../services/adminReservationService';
+import { getSites } from '../services/publicDataService';
 
 const ReservationsPage = () => {
   const [reservations, setReservations] = useState([]);
@@ -12,20 +12,58 @@ const ReservationsPage = () => {
   const [siteFilter, setSiteFilter] = useState('all');
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState('view');
+  const [sites, setSites] = useState([]);
 
   useEffect(() => {
     loadReservations();
+    loadFiltersData();
   }, []);
 
   useEffect(() => {
     filterReservations();
   }, [reservations, searchTerm, statusFilter, siteFilter]);
 
-  const loadReservations = () => {
-    const allReservations = JSON.parse(localStorage.getItem('reservations') || '[]');
-    const sortedReservations = allReservations.sort((a, b) => new Date(b.dateCreation) - new Date(a.dateCreation));
-    setReservations(sortedReservations);
+  const loadFiltersData = async () => {
+    try {
+      const sitesArr = await getSites();
+      setSites(Array.isArray(sitesArr) ? sitesArr : []);
+    } catch {
+      setSites([]);
+    }
+  };
+
+  const loadReservations = async () => {
+    try {
+      // Charger toutes les réservations (admin)
+      const res = await getAdminReservations({ limit: 200 });
+      const all = res?.data || [];
+
+      const normalized = all.map((r) => ({
+        id: r.id,
+        status: r.statut,
+        userName: r.user?.name || '',
+        userEmail: r.user?.email || '',
+        userId: String(r.user_id ?? r.user?.id ?? ''),
+        dateDebut: r.date_debut,
+        dateFin: r.date_fin,
+        creneau: r.creneau,
+        participants: r.participants_estimes,
+        motif: r.motif || '',
+        site: r.local?.site?.nom || '',
+        siteId: String(r.local?.site?.id ?? ''),
+        localNom: r.local?.nom || '',
+        localId: String(r.local_id ?? r.local?.id ?? ''),
+        dateCreation: r.created_at,
+        raw: r,
+      }));
+
+      const sortedReservations = normalized.sort((a, b) => new Date(b.dateCreation) - new Date(a.dateCreation));
+      setReservations(sortedReservations);
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'Erreur lors du chargement des réservations');
+      setReservations([]);
+    }
   };
 
   const filterReservations = () => {
@@ -35,7 +73,7 @@ const ReservationsPage = () => {
       filtered = filtered.filter(res =>
         res.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         res.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        res.motif.toLowerCase().includes(searchTerm.toLowerCase())
+        (res.motif || '').toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -44,7 +82,8 @@ const ReservationsPage = () => {
     }
 
     if (siteFilter !== 'all') {
-      filtered = filtered.filter(res => res.site === siteFilter);
+      // siteFilter peut être un id (select) => on compare avec siteId si dispo, sinon fallback sur le nom.
+      filtered = filtered.filter(res => res.siteId === String(siteFilter) || res.site === siteFilter);
     }
 
     setFilteredReservations(filtered);
@@ -95,27 +134,28 @@ const ReservationsPage = () => {
     }
   };
 
-  const handleStatusChange = (reservationId, newStatus) => {
-    const updatedReservations = reservations.map(res =>
-      res.id === reservationId ? { ...res, status: newStatus, lastUpdated: new Date().toISOString() } : res
-    );
-    setReservations(updatedReservations);
-    localStorage.setItem('reservations', JSON.stringify(updatedReservations));
-
-    const reservation = updatedReservations.find(res => res.id === reservationId);
-    console.log(`Email envoyé à ${reservation.userId} - Statut: ${newStatus}`);
-  };
-
-  const handleDeleteReservation = (reservationId) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) {
-      const updatedReservations = reservations.filter(res => res.id !== reservationId);
-      setReservations(updatedReservations);
-      localStorage.setItem('reservations', JSON.stringify(updatedReservations));
+  const handleStatusChange = async (reservationId, newStatus) => {
+    try {
+      if (newStatus === 'confirmee') {
+        await validateAdminReservation(reservationId);
+      } else if (newStatus === 'refusee') {
+        // The backend requires commentaire_admin min length 10
+        const reason = window.prompt('Motif du refus (min 10 caractères):');
+        if (!reason) return;
+        await refuseAdminReservation(reservationId, reason);
+      }
+      await loadReservations();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'Erreur lors du changement de statut');
     }
   };
 
-  const openModal = (type, reservation = null) => {
-    setModalType(type);
+  const handleDeleteReservation = () => {
+    alert('La suppression n\'est pas implémentée côté API. Utilisez Annuler dans le backend si besoin.');
+  };
+
+  const openModal = (_type, reservation = null) => {
     setSelectedReservation(reservation);
     setShowModal(true);
   };
@@ -123,7 +163,6 @@ const ReservationsPage = () => {
   const closeModal = () => {
     setShowModal(false);
     setSelectedReservation(null);
-    setModalType('view');
   };
 
   const getCreneauLabel = (creneau) => {
@@ -215,7 +254,7 @@ const ReservationsPage = () => {
               >
                 <option value="all">Tous les sites</option>
                 {sites.map(site => (
-                  <option key={site.id} value={site.id}>{site.name}</option>
+                  <option key={site.id} value={site.id}>{site.nom || site.name || site.site_id || site.id}</option>
                 ))}
               </select>
             </div>
@@ -260,8 +299,6 @@ const ReservationsPage = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredReservations.map((reservation) => {
-                  const local = locaux.find(l => l.id === reservation.localId);
-                  const site = sites.find(s => s.id === reservation.site);
                   const statusInfo = getStatusInfo(reservation.status);
 
                   return (
@@ -277,9 +314,9 @@ const ReservationsPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {local?.nom || 'Local supprimé'}
+                            {reservation.localNom || 'Local'}
                           </div>
-                          <div className="text-sm text-gray-500">{site?.name || 'Site inconnu'}</div>
+                          <div className="text-sm text-gray-500">{reservation.site || 'Site'}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -402,11 +439,11 @@ const ReservationsPage = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <span className="text-sm font-medium text-gray-700">Local :</span>
-                        <span className="ml-2">{locaux.find(l => l.id === selectedReservation.localId)?.nom}</span>
+                        <span className="ml-2">{selectedReservation.localNom || '-'}</span>
                       </div>
                       <div>
                         <span className="text-sm font-medium text-gray-700">Site :</span>
-                        <span className="ml-2">{sites.find(s => s.id === selectedReservation.site)?.name}</span>
+                        <span className="ml-2">{selectedReservation.site || '-'}</span>
                       </div>
                       <div>
                         <span className="text-sm font-medium text-gray-700">Date début :</span>
@@ -471,3 +508,4 @@ const ReservationsPage = () => {
 };
 
 export default ReservationsPage;
+

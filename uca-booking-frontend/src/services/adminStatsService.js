@@ -1,0 +1,10 @@
+import { api } from '../utils/apiClient';
+
+export async function getDashboardKPIs() {
+  const { data } = await api.get('/admin/stats/dashboard-kpis');
+  if (!data?.success) {
+    throw new Error(data?.message || 'Erreur lors du chargement des KPIs');
+  }
+  return data;
+}
+

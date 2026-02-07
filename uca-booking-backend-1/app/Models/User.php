@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    use HasApiTokens, Notifiable, HasFactory;
 
     protected $fillable = [
         'google_id',
@@ -18,7 +19,8 @@ class User extends Authenticatable
         'fonction',
         'role',
         'is_active',
-        'last_login'
+        'last_login',
+        'password',
     ];
 
     protected $hidden = [

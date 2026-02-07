@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getAuthToken, clearAuthToken } from '../utils/apiClient';
+import { verifyToken as verifyTokenApi } from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -16,19 +18,52 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est déjà connecté
-    const savedUser = localStorage.getItem('user');
-    const savedIsAdmin = localStorage.getItem('isAdmin');
+    // Restauration de session: si un token existe, on le vérifie côté API.
+    const restoreSession = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) {
+          setLoading(false);
+          return;
+        }
 
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+        const userData = await verifyTokenApi();
+        setUser(userData);
+        setIsAdmin(userData?.role === 'admin');
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('isAdmin', (userData?.role === 'admin').toString());
+      } catch (e) {
+        clearAuthToken();
+        localStorage.removeItem('user');
+        localStorage.removeItem('isAdmin');
+        setUser(null);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Fallback (ancien comportement) si aucun token: charger user/localStorage
+    const restoreLegacy = () => {
+      const savedUser = localStorage.getItem('user');
+      const savedIsAdmin = localStorage.getItem('isAdmin');
+
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+
+      if (savedIsAdmin === 'true') {
+        setIsAdmin(true);
+      }
+
+      setLoading(false);
+    };
+
+    if (getAuthToken()) {
+      restoreSession();
+    } else {
+      restoreLegacy();
     }
-
-    if (savedIsAdmin === 'true') {
-      setIsAdmin(true);
-    }
-
-    setLoading(false);
   }, []);
 
   const login = (userData, adminStatus = false) => {
@@ -42,6 +77,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setIsAdmin(false);
+
+    clearAuthToken();
 
     localStorage.removeItem('user');
     localStorage.removeItem('isAdmin');

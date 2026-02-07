@@ -1,41 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Building2 } from 'lucide-react';
 import Filters from './Filters';
 import LocalCard from './LocalCard';
-import { refreshLocaux } from '../data/locaux';
+import { getLocaux, getSites } from '../services/publicDataService';
 
 const LocauxSection = () => {
   const [selectedSite, setSelectedSite] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [locaux, setLocaux] = useState([]);
+  const [sites, setSites] = useState([]);
 
-  // Charger les locaux au montage du composant
+  // Charger les locaux + sites depuis l'API au montage du composant
   useEffect(() => {
-    const loadLocaux = () => {
-      const allLocaux = refreshLocaux();
-      setLocaux(allLocaux);
-    };
-    
-    loadLocaux();
-    
-    // Écouter les changements dans localStorage (pour rafraîchir quand admin ajoute un local)
-    const handleStorageChange = (e) => {
-      if (e.key === 'locaux') {
-        loadLocaux();
+    const load = async () => {
+      try {
+        const [locauxData, sitesData] = await Promise.all([getLocaux(), getSites()]);
+        setLocaux(locauxData);
+        setSites(sitesData);
+      } catch (e) {
+        console.error(e);
+        setLocaux([]);
+        setSites([]);
       }
     };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
+
+    load();
   }, []);
 
+  const getLocalSiteKey = (local) => {
+    // Backend: local.site.site_id (string) + local.site_id (FK int)
+    return local?.site?.site_id || local?.site_id || local?.site;
+  };
+
+  const getLocalName = (local) => local?.nom || local?.name || '';
+
+  // Convertit les sites backend -> options de filtre
+  const siteFilters = useMemo(() => {
+    const options = (sites || []).map((s) => ({
+      id: s.site_id || String(s.id),
+      name: s.nom || s.name || s.site_id || String(s.id),
+      icon: Building2,
+    }));
+
+    return [{ id: 'all', name: 'Tous les sites', icon: Building2 }, ...options];
+  }, [sites]);
+
   // Filtrer les locaux
-  const locauxFiltres = locaux.filter(local => {
-    const matchSite = selectedSite === 'all' || local.site === selectedSite;
-    const matchSearch = local.nom.toLowerCase().includes(searchTerm.toLowerCase());
+  const locauxFiltres = locaux.filter((local) => {
+    const siteKey = getLocalSiteKey(local);
+    const matchSite = selectedSite === 'all' || siteKey === selectedSite;
+    const matchSearch = getLocalName(local).toLowerCase().includes(searchTerm.toLowerCase());
     return matchSite && matchSearch;
   });
 
@@ -47,11 +61,12 @@ const LocauxSection = () => {
           <p className="text-lg text-gray-600">Découvrez nos espaces disponibles</p>
         </div>
 
-        <Filters 
+        <Filters
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           selectedSite={selectedSite}
           setSelectedSite={setSelectedSite}
+          sites={siteFilters}
         />
 
         {/* Grille des locaux */}

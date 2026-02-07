@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, Calendar, MapPin, Users, Clock, CheckCircle, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 import { sites } from '../data/sites';
 import { locaux } from '../data/locaux';
+import { getMyReservations, cancelReservation } from '../services/reservationService';
 
 const MesReservationsPage = () => {
   const navigate = useNavigate();
@@ -17,16 +18,19 @@ const MesReservationsPage = () => {
       return;
     }
 
-    // Charger les réservations de l'utilisateur
-    const loadReservations = () => {
-      const allReservations = JSON.parse(localStorage.getItem('reservations') || '[]');
-      const userReservations = allReservations.filter(res => res.userId === user.email);
-      setReservations(userReservations.sort((a, b) => new Date(b.dateCreation) - new Date(a.dateCreation)));
-      setLoading(false);
+    const loadReservations = async () => {
+      try {
+        const data = await getMyReservations();
+        setReservations(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadReservations();
-  }, [isAuthenticated, navigate, user]);
+  }, [isAuthenticated, navigate]);
 
   const getStatusInfo = (status) => {
     switch (status) {
@@ -86,19 +90,16 @@ const MesReservationsPage = () => {
     }
   };
 
-  const handleAnnulerReservation = (reservationId) => {
+  const handleAnnulerReservation = async (reservationId) => {
     if (window.confirm('Êtes-vous sûr de vouloir annuler cette réservation ?')) {
-      const allReservations = JSON.parse(localStorage.getItem('reservations') || '[]');
-      const updatedReservations = allReservations.map(res =>
-        res.id === reservationId
-          ? { ...res, status: 'annulee' }
-          : res
-      );
-      localStorage.setItem('reservations', JSON.stringify(updatedReservations));
-
-      // Recharger les réservations
-      const userReservations = updatedReservations.filter(res => res.userId === user.email);
-      setReservations(userReservations.sort((a, b) => new Date(b.dateCreation) - new Date(a.dateCreation)));
+      try {
+        await cancelReservation(reservationId);
+        const data = await getMyReservations();
+        setReservations(data);
+      } catch (e) {
+        console.error(e);
+        alert(e?.message || 'Erreur lors de l\'annulation');
+      }
     }
   };
 

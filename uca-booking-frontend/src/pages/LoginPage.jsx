@@ -4,7 +4,9 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { GOOGLE_CLIENT_ID } from '../config/config';
 import { userManager } from '../utils/UserManager';
-import { ArrowLeft, User, Shield, Mail, Lock, AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { googleLogin as googleLoginApi } from '../services/authService';
+import { loginApi, registerApi } from '../services/passwordAuthService';
+import { ArrowLeft, User, Shield, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -36,25 +38,22 @@ const LoginPage = () => {
     if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
 
-  const handleGoogleSuccess = (credentialResponse) => {
+  const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      const base64Url = credentialResponse.credential.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c =>
-        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-      ).join(''));
-
-      const userData = JSON.parse(jsonPayload);
-      if (!userData.email.endsWith('@uca.ma') && !userData.email.endsWith('@uca.ac.ma')) {
-        setError('Seuls les emails académiques UCA sont autorisés (@uca.ma ou @uca.ac.ma)');
+      setError('');
+      const googleIdToken = credentialResponse?.credential;
+      if (!googleIdToken) {
+        setError('Token Google manquant. Réessayez.');
         return;
       }
-      const user = { name: userData.name, email: userData.email, picture: userData.picture };
-      login(user, false);
-      navigate('/');
+
+      const { user: apiUser } = await googleLoginApi(googleIdToken);
+
+      login(apiUser, apiUser?.role === 'admin');
+      navigate(apiUser?.role === 'admin' ? '/admin-dashboard' : '/');
     } catch (err) {
       console.error(err);
-      setError('Erreur lors de la connexion avec Google');
+      setError(err?.message || 'Erreur lors de la connexion avec Google');
     }
   };
 
@@ -63,41 +62,43 @@ const LoginPage = () => {
     setShowManualLogin(true);
   };
 
-  const handleManualLogin = (e) => {
+  const handleManualLogin = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      const userData = userManager.login(email, password);
-      const isAdminUser = userData.role === 'admin';
-      login(userData, isAdminUser);
+      const { user: apiUser } = await loginApi({ email, password });
+      const isAdminUser = apiUser?.role === 'admin';
+      login(apiUser, isAdminUser);
       navigate(isAdminUser ? '/admin-dashboard' : '/');
     } catch (err) {
-      setError(err.message);
+      setError(err?.message || 'Connexion échouée');
     }
   };
 
-  const handleAdminLogin = (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      const userData = userManager.login(email, password);
-      if (userData.role !== 'admin') throw new Error('Accès administrateur refusé.');
-      login(userData, true);
+      const { user: apiUser } = await loginApi({ email, password });
+      if (apiUser?.role !== 'admin') throw new Error('Accès administrateur refusé.');
+      login(apiUser, true);
       navigate('/admin-dashboard');
     } catch (err) {
-      setError(err.message);
+      setError(err?.message || 'Connexion admin échouée');
     }
   };
 
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      const userData = userManager.register(email, password);
-      login(userData, false);
+      // name est requis côté backend; on dérive un nom basique depuis l’email.
+      const name = (email || '').split('@')[0] || 'Utilisateur';
+      const { user: apiUser } = await registerApi({ name, email, password });
+      login(apiUser, false);
       navigate('/');
     } catch (err) {
-      setError(err.message);
+      setError(err?.message || 'Inscription échouée');
     }
   };
 
