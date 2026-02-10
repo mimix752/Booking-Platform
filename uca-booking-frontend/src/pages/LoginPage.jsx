@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { GOOGLE_CLIENT_ID } from '../config/config';
 import { userManager } from '../utils/UserManager';
 import { googleLogin as googleLoginApi } from '../services/authService';
-import { loginApi, registerApi } from '../services/passwordAuthService';
-import { ArrowLeft, User, Shield, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { loginApi } from '../services/passwordAuthService';
+import { ArrowLeft, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -14,7 +14,6 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [emailValidation, setEmailValidation] = useState({ isValid: true, error: null });
-  const [loginMode, setLoginMode] = useState('user');
   const [showManualLogin, setShowManualLogin] = useState(false);
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
@@ -75,33 +74,6 @@ const LoginPage = () => {
     }
   };
 
-  const handleAdminLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const { user: apiUser } = await loginApi({ email, password });
-      if (apiUser?.role !== 'admin') throw new Error('Accès administrateur refusé.');
-      login(apiUser, true);
-      navigate('/admin-dashboard');
-    } catch (err) {
-      setError(err?.message || 'Connexion admin échouée');
-    }
-  };
-
-  const handleSignUp = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      // name est requis côté backend; on dérive un nom basique depuis l’email.
-      const name = (email || '').split('@')[0] || 'Utilisateur';
-      const { user: apiUser } = await registerApi({ name, email, password });
-      login(apiUser, false);
-      navigate('/');
-    } catch (err) {
-      setError(err?.message || 'Inscription échouée');
-    }
-  };
-
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <style>{`
@@ -147,20 +119,19 @@ const LoginPage = () => {
         <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100">
           {/* Pattern background */}
           <div
-  className="absolute inset-0 opacity-15"
-  style={{ 
-    backgroundImage: "url('/pattern.png')", 
-    backgroundRepeat: "no-repeat",      // empêche la répétition
-    backgroundSize: "cover",            // couvre tout l'espace
-    backgroundPosition: "center"        // centre l'image
-  }}
-/>
-
+            className="absolute inset-0 opacity-15"
+            style={{ 
+              backgroundImage: "url('/pattern.png')", 
+              backgroundRepeat: "no-repeat",
+              backgroundSize: "cover",
+              backgroundPosition: "center"
+            }}
+          />
           
           {/* Content */}
           <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24 animate-slideInLeft">
             {/* Logo */}
-            <div className="mb-12 ">
+            <div className="mb-12">
               <img 
                 src="/logo-nobck.png" 
                 alt="UCA Logo" 
@@ -172,7 +143,6 @@ const LoginPage = () => {
             <div className="mb-8">
               <div className="inline-flex items-center gap-2 mb-4">
                 <div className="w-12 h-1 bg-gradient-to-r from-amber-500 to-transparent rounded-full" />
-                
               </div>
               <h1 className="text-5xl xl:text-6xl font-bold text-stone-800 mb-6 leading-tight">
                 Accédez à votre
@@ -181,12 +151,9 @@ const LoginPage = () => {
                 </span>
               </h1>
               <p className="text-lg text-stone-600 leading-relaxed max-w-md">
-               Connectez-vous pour gérer facilement et en toute sécurité les salles et espaces institutionnels de l’Université Cadi Ayyad.
+                Connectez-vous pour gérer facilement et en toute sécurité les salles et espaces institutionnels de l'Université Cadi Ayyad.
               </p>
             </div>
-
-            
-            
           </div>
         </div>
 
@@ -216,48 +183,15 @@ const LoginPage = () => {
             {/* Header */}
             <div className="mb-10">
               <h2 className="text-3xl font-bold text-stone-900 mb-2">
-                {loginMode === 'user' ? 'Bienvenue' : 'Accès Administrateur'}
+                Bienvenue
               </h2>
               <p className="text-stone-600">
-                {loginMode === 'user' 
-                  ? 'Connectez-vous pour continuer' 
-                  : 'Connexion sécurisée pour les administrateurs'}
+                Connectez-vous pour continuer
               </p>
             </div>
 
-            {/* Mode Switcher */}
-            <div className="mb-8">
-              <div className="relative bg-stone-100 rounded-2xl p-1.5">
-                <div 
-                  className="absolute top-1.5 bottom-1.5 bg-white rounded-xl shadow-md transition-all duration-500 ease-out"
-                  style={{
-                    left: loginMode === 'user' ? '6px' : '50%',
-                    right: loginMode === 'user' ? '50%' : '6px',
-                  }} 
-                />
-                
-                <div className="relative flex gap-2">
-                  <button 
-                    onClick={() => { setLoginMode('user'); setError(''); setShowManualLogin(false); }}
-                    className={`flex-1 flex items-center justify-center py-3 px-4 rounded-xl transition-all duration-500 font-semibold text-sm ${
-                      loginMode === 'user' ? 'text-stone-900' : 'text-stone-500'
-                    }`}>
-                    <User className="w-4 h-4 mr-2" /> Personnel
-                  </button>
-                  
-                  <button 
-                    onClick={() => { setLoginMode('admin'); setError(''); setShowManualLogin(false); }}
-                    className={`flex-1 flex items-center justify-center py-3 px-4 rounded-xl transition-all duration-500 font-semibold text-sm ${
-                      loginMode === 'admin' ? 'text-stone-900' : 'text-stone-500'
-                    }`}>
-                    <Shield className="w-4 h-4 mr-2" /> Admin
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* Login Forms */}
-            {!showManualLogin && loginMode === 'user' ? (
+            {!showManualLogin ? (
               <div className="space-y-6">
                 <p className="text-center text-sm text-stone-600 font-medium">
                   Utilisez votre compte Google académique UCA
@@ -292,7 +226,7 @@ const LoginPage = () => {
               </div>
             ) : (
               <form 
-                onSubmit={loginMode === 'admin' ? handleAdminLogin : handleManualLogin} 
+                onSubmit={handleManualLogin} 
                 className="space-y-5">
                 
                 {/* Email */}
@@ -344,35 +278,23 @@ const LoginPage = () => {
                   </div>
                 </div>
 
-                {/* Buttons */}
-                <div className="flex gap-3 pt-4">
+                {/* Login Button */}
+                <div className="pt-4">
                   <button 
                     type="submit" 
                     disabled={!emailValidation.isValid || !email || !password}
-                    className="btn-hover flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 shimmer-btn text-white py-3.5 px-6 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
+                    className="btn-hover w-full bg-gradient-to-r from-amber-500 to-yellow-500 shimmer-btn text-white py-3.5 px-6 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
                     Se connecter
                   </button>
-                  
-                  {loginMode === 'user' && (
-                    <button 
-                      type="button" 
-                      onClick={handleSignUp} 
-                      disabled={!emailValidation.isValid || !email || !password}
-                      className="btn-hover flex-1 bg-stone-800 text-white py-3.5 px-6 rounded-xl font-bold shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none hover:bg-stone-900">
-                      S'inscrire
-                    </button>
-                  )}
                 </div>
 
                 {/* Back to Google */}
-                {showManualLogin && loginMode === 'user' && (
-                  <button 
-                    type="button"
-                    onClick={() => setShowManualLogin(false)} 
-                    className="w-full text-sm text-stone-500 hover:text-amber-600 font-medium transition-colors mt-2">
-                    ← Retour à Google Sign-In
-                  </button>
-                )}
+                <button 
+                  type="button"
+                  onClick={() => setShowManualLogin(false)} 
+                  className="w-full text-sm text-stone-500 hover:text-amber-600 font-medium transition-colors mt-2">
+                  ← Retour à Google Sign-In
+                </button>
               </form>
             )}
 
