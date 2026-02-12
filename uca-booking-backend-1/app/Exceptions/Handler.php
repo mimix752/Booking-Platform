@@ -14,7 +14,12 @@ class Handler extends ExceptionHandler
      */
     protected function unauthenticated($request, \Illuminate\Auth\AuthenticationException $exception)
     {
-        if ($request->expectsJson() || $request->is('api/*')) {
+        // Robust detection for API requests: Accept header, ajax, path segment 'api' or route pattern
+        $acceptHeader = (string) $request->header('Accept');
+        $isApiPath = $request->is('api/*') || $request->segment(1) === 'api';
+        $wantsJson = $request->expectsJson() || $request->wantsJson() || $request->ajax() || str_contains($acceptHeader, 'application/json');
+
+        if ($wantsJson || $isApiPath) {
             return response()->json([
                 'success' => false,
                 'message' => 'Non authentifié'
@@ -26,4 +31,3 @@ class Handler extends ExceptionHandler
 
     // ...existing code...
 }
-

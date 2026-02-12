@@ -55,6 +55,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/{id}/cancel', [ReservationController::class, 'cancel']);
     });
 
+    // Historique des réservations (accessible à tous les utilisateurs authentifiés)
+    Route::get('/admin/reservations/history', [ReservationController::class, 'getHistory']);
+
     // Profil utilisateur
     Route::prefix('profile')->group(function () {
         Route::get('/', [UserController::class, 'profile']);
@@ -83,12 +86,18 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('reservations')->group(function () {
             Route::get('/', [AdminController::class, 'getAllReservations']);
             Route::get('/pending', [AdminController::class, 'getPendingReservations']);
+            Route::get('/history', [AdminController::class, 'getReservationHistory']);
+            Route::get('/{id}/history', [AdminController::class, 'getReservationDetailHistory']);
             Route::post('/create', [AdminController::class, 'createAdminReservation']);
             Route::post('/{id}/validate', [AdminController::class, 'validateReservation']);
             Route::post('/{id}/refuse', [AdminController::class, 'refuseReservation']);
             Route::post('/{id}/cancel', [AdminController::class, 'cancelReservation']);
             Route::put('/{id}', [AdminController::class, 'updateReservation']);
         });
+
+        // Backward-compatible hyphenated routes (some frontend builds request these)
+        Route::get('/reservation-histories', [AdminController::class, 'getReservationHistory']);
+        Route::get('/reservation-histories/{id}', [AdminController::class, 'getReservationDetailHistory']);
 
         // Gestion des utilisateurs
         Route::prefix('users')->group(function () {

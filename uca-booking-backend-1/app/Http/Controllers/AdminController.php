@@ -9,9 +9,11 @@ use App\Models\Log;
 use App\Mail\ReservationConfirmed;
 use App\Mail\ReservationRefused;
 use App\Mail\ReservationCancelled;
+use App\Services\ReservationHistoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
+
 
 class AdminController extends Controller
 {
@@ -177,7 +179,13 @@ class AdminController extends Controller
                 'commentaire_admin' => $request->commentaire_admin
             ]);
 
-            // Envoyer l'email de confirmation (ne doit pas casser l'API)
+            // Enregistrer dans l'historique
+            ReservationHistoryService::recordValidation(
+                $reservation,
+                $request->commentaire_admin
+            );
+
+            // Envoi de l'email de confirmation (ne doit pas empêcher la validation)
             try {
                 Mail::to($reservation->user->email)->send(new ReservationConfirmed($reservation));
             } catch (\Throwable $mailException) {
@@ -246,6 +254,12 @@ class AdminController extends Controller
                 'validated_at' => now(),
                 'commentaire_admin' => $request->commentaire_admin
             ]);
+
+            // Enregistrer dans l'historique
+            ReservationHistoryService::recordRefusal(
+                $reservation,
+                $request->commentaire_admin
+            );
 
             // Envoyer l'email de refus (ne doit pas casser l'API)
             try {
@@ -317,6 +331,12 @@ class AdminController extends Controller
                 'cancellation_reason' => $request->cancellation_reason,
                 'commentaire_admin' => $request->cancellation_reason
             ]);
+
+            // Enregistrer dans l'historique
+            ReservationHistoryService::recordCancellation(
+                $reservation,
+                $request->cancellation_reason
+            );
 
             // Envoyer l'email d'annulation (ne doit pas casser l'API)
             try {
@@ -391,7 +411,26 @@ class AdminController extends Controller
                 ], 400);
             }
 
+            // Capturer les changements avant la mise à jour
+            $oldValues = $reservation->getAttributes();
+
             $reservation->update($request->all());
+
+            // Enregistrer les changements dans l'historique
+            $changes = [];
+            foreach ($request->all() as $key => $value) {
+                if (isset($oldValues[$key]) && $oldValues[$key] !== $value) {
+                    $changes[$key] = $value;
+                }
+            }
+
+            if (!empty($changes)) {
+                ReservationHistoryService::recordUpdate(
+                    $reservation,
+                    $changes,
+                    'Réservation modifiée par l\'administrateur'
+                );
+            }
 
             // Log de l'action
             Log::create([
@@ -469,6 +508,12 @@ class AdminController extends Controller
                 'validated_at' => now(),
                 'commentaire_admin' => $request->commentaire_admin
             ]);
+
+            // Enregistrer dans l'historique
+            ReservationHistoryService::recordCreation(
+                $reservation,
+                'Réservation créée administrativement et directement confirmée'
+            );
 
             // Log de l'action
             Log::create([
@@ -610,6 +655,205 @@ class AdminController extends Controller
                 'success' => false,
                 'message' => 'Erreur lors de la suppression de la date bloquée'
             ], 500);
+        }
+    }
+
+    /**
+     * Récupérer l'historique des réservations
+     */
+    public function getReservationHistory(Request $request)
+    {
+        try {
+            $filters = [];
+            $limit = $request->get('limit', 50);
+
+            // Filtres optionnels
+            if ($request->has('reservation_id')) {
+                $filters['reservation_id'] = $request->reservation_id;
+            }
+
+            if ($request->has('user_id')) {
+                $filters['user_id'] = $request->user_id;
+            }
+
+            if ($request->has('action')) {
+                $filters['action'] = $request->action;
+            }
+
+            if ($request->has('site_id')) {
+                $filters['site_id'] = $request->site_id;
+            }
+
+            if ($request->has('date_from')) {
+                $filters['date_from'] = $request->date_from;
+            }
+
+            if ($request->has('date_to')) {
+                $filters['date_to'] = $request->date_to;
+            }
+
+            $history = \App\Services\ReservationHistoryService::getAllHistory($filters, $limit);
+
+            // Normalize items: add 'nom_demandeur' for frontend convenience
+            $items = collect($history->items())->map(function ($h) {
+                $item = $h->toArray();
+
+                // Reservation-level defaults
+                $reservation = $h->reservation ?? null;
+                $resUser = $reservation && $reservation->user ? $reservation->user : null;
+                $resLocal = $reservation && $reservation->local ? $reservation->local : null;
+                $resSite = $resLocal && $resLocal->site ? $resLocal->site : null;
+
+                // Determine requester name/email
+                $nomDemandeur = '';
+                if ($reservation && !empty($resUser->name)) {
+                    $nomDemandeur = $resUser->name;
+                } elseif (!empty($h->user) && !empty($h->user->name)) {
+                    $nomDemandeur = $h->user->name;
+                }
+
+                $emailDemandeur = '';
+                if ($reservation && !empty($resUser->email)) {
+                    $emailDemandeur = $resUser->email;
+                } elseif (!empty($h->user) && !empty($h->user->email)) {
+                    $emailDemandeur = $h->user->email;
+                }
+
+                // Preserve original objects
+                $item['user_obj'] = $item['user'] ?? null;
+                $item['reservation_obj'] = $item['reservation'] ?? null;
+
+                // Overwrite top-level user with the requester's name string (frontend expects string)
+                $item['user'] = $nomDemandeur;
+                $item['nom_demandeur'] = $nomDemandeur;
+                $item['email_demandeur'] = $emailDemandeur;
+
+                // Reservation fields (flattened) - use reservation if present, else try new_values/old_values (safe via data_get)
+                $item['date_debut'] = $reservation->date_debut ?? (data_get($item, 'new_values.date_debut') ?? data_get($item, 'old_values.date_debut'));
+                $item['date_fin'] = $reservation->date_fin ?? (data_get($item, 'new_values.date_fin') ?? data_get($item, 'old_values.date_fin'));
+                $item['creneau'] = $reservation->creneau ?? (data_get($item, 'new_values.creneau') ?? data_get($item, 'old_values.creneau'));
+                $item['nature_evenement'] = $reservation->nature_evenement ?? (data_get($item, 'new_values.nature_evenement') ?? null);
+                $item['participants_estimes'] = $reservation->participants_estimes ?? (data_get($item, 'new_values.participants_estimes') ?? null);
+                $item['motif'] = $reservation->motif ?? (data_get($item, 'new_values.motif') ?? null);
+                $item['statut'] = $reservation->statut ?? (data_get($item, 'new_values.statut') ?? (data_get($item, 'old_values.statut') ?? null));
+                $item['commentaire_admin'] = $reservation->commentaire_admin ?? (data_get($item, 'new_values.commentaire_admin') ?? null);
+
+                // Local/site fields
+                $item['local_id'] = $reservation->local_id ?? (data_get($item, 'new_values.local_id') ?? null);
+                $item['local_nom'] = $resLocal->nom ?? (data_get($item, 'new_values.local_nom') ?? ($resLocal->name ?? null));
+                $item['site_id'] = $resSite->id ?? ($resLocal->site_id ?? (data_get($item, 'new_values.site_id') ?? null));
+                $item['site_nom'] = $resSite->nom ?? ($resSite->name ?? null);
+
+                // Provide aliases the frontend expects
+                $item['local'] = $item['local'] ?? $item['local_nom'] ?? ($resLocal->nom ?? null);
+                $item['salle'] = $item['salle'] ?? $item['local'];
+                $item['site'] = $item['site'] ?? $item['site_nom'] ?? ($resSite->nom ?? null);
+                $item['lieu'] = $item['lieu'] ?? $item['site'];
+
+                // Date/time aliases
+                $item['date'] = $item['date'] ?? $item['date_debut'] ?? null;
+                // Compute heureDebut/heureFin from creneau if possible
+                $heureDebut = $item['heure_debut'] ?? null;
+                $heureFin = $item['heure_fin'] ?? null;
+                if (empty($heureDebut) && !empty($item['creneau'])) {
+                    if ($item['creneau'] === 'matin') {
+                        $heureDebut = '08:00'; $heureFin = '12:00';
+                    } elseif ($item['creneau'] === 'apres-midi') {
+                        $heureDebut = '14:00'; $heureFin = '18:00';
+                    } elseif ($item['creneau'] === 'journee-complete') {
+                        $heureDebut = '08:00'; $heureFin = '18:00';
+                    }
+                }
+                $item['heure_debut'] = $item['heure_debut'] ?? $heureDebut;
+                $item['heureDebut'] = $item['heureDebut'] ?? $item['heure_debut'];
+                $item['heure_fin'] = $item['heure_fin'] ?? $heureFin;
+                $item['heureFin'] = $item['heureFin'] ?? $item['heure_fin'];
+
+                // Event / motif aliases
+                $item['event'] = $item['event'] ?? $item['nature_evenement'] ?? null;
+                $item['type_reunion'] = $item['type_reunion'] ?? $item['event'];
+                // provide raison as alias for motif
+                $item['motif'] = $item['motif'] ?? null;
+                $item['raison'] = $item['raison'] ?? $item['motif'];
+
+                // Participants aliases
+                $item['participants_estimes'] = $item['participants_estimes'] ?? $item['participants_estimes'] ?? null;
+                $item['participants'] = $item['participants'] ?? $item['participants_estimes'] ?? (data_get($item, 'new_values.participants') ?? null) ?? $item['nombre_participants'] ?? null;
+                $item['nombre_participants'] = $item['nombre_participants'] ?? $item['participants'];
+
+                // Commentaire aliases
+                $item['commentaire_admin'] = $item['commentaire_admin'] ?? null;
+                $item['commentaire'] = $item['commentaire'] ?? $item['commentaire_admin'] ?? null;
+
+                // Status/status alias
+                $item['statut'] = $item['statut'] ?? ($item['status'] ?? null);
+                // Normalize to English keys for frontend ('confirmed','refused','cancelled')
+                $statutLower = is_string($item['statut']) ? strtolower($item['statut']) : '';
+                $normalized = null;
+                if (in_array($statutLower, ['confirmee', 'confirmée', 'confirmée', 'confirmé', 'confirme', 'confirmed', 'confirm'])) {
+                    $normalized = 'confirmed';
+                } elseif (in_array($statutLower, ['refusee', 'refusée', 'refused', 'refuse'])) {
+                    $normalized = 'refused';
+                } elseif (in_array($statutLower, ['annulee_admin', 'annulee_utilisateur', 'annulée', 'annulee', 'annule', 'cancelled', 'annulee_admin', 'annulee'])) {
+                    $normalized = 'cancelled';
+                } elseif ($statutLower === 'en_attente' || $statutLower === 'pending') {
+                    $normalized = 'pending';
+                } else {
+                    // fallback: use original as-is
+                    $normalized = $item['statut'];
+                }
+                $item['status'] = $item['status'] ?? $normalized;
+
+                // Keep created_at (history timestamp)
+                $item['history_created_at'] = $h->created_at ?? $item['created_at'] ?? null;
+
+                return $item;
+            })->all();
+
+            return response()->json([
+                'success' => true,
+                'data' => $items,
+                'pagination' => [
+                    'total' => $history->total(),
+                    'page' => $history->currentPage(),
+                    'limit' => $history->perPage(),
+                    'totalPages' => $history->lastPage()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération de l\'historique des réservations: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Récupérer l'historique d'une réservation spécifique
+     */
+    public function getReservationDetailHistory(Request $request, $reservationId)
+    {
+        try {
+            $reservation = Reservation::findOrFail($reservationId);
+            $limit = $request->get('limit', 50);
+
+            $history = \App\Services\ReservationHistoryService::getReservationHistory($reservation, $limit);
+
+            return response()->json([
+                'success' => true,
+                'data' => $history->items(),
+                'pagination' => [
+                    'total' => $history->total(),
+                    'page' => $history->currentPage(),
+                    'limit' => $history->perPage(),
+                    'totalPages' => $history->lastPage()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération de l\'historique: ' . $e->getMessage()
+            ], 404);
         }
     }
 

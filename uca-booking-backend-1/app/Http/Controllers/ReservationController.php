@@ -7,6 +7,7 @@ use App\Models\Local;
 use App\Models\BlackoutDate;
 use App\Models\Log;
 use App\Mail\ReservationCreated;
+use App\Services\ReservationHistoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
@@ -78,6 +79,12 @@ class ReservationController extends Controller
             }
 
             $reservation->save();
+
+            // Enregistrer dans l'historique
+            ReservationHistoryService::recordCreation(
+                $reservation,
+                'Réservation créée par l\'utilisateur'
+            );
 
             // Envoyer l'email de confirmation
             Mail::to($user->email)->send(new ReservationCreated($reservation));
@@ -215,6 +222,12 @@ class ReservationController extends Controller
                 'cancellation_reason' => $request->cancellation_reason
             ]);
 
+            // Enregistrer dans l'historique
+            ReservationHistoryService::recordCancellation(
+                $reservation,
+                $request->cancellation_reason
+            );
+
             // Log de l'action
             Log::create([
                 'user_id' => $request->user()->id,
@@ -237,5 +250,134 @@ class ReservationController extends Controller
                 'message' => 'Erreur lors de l\'annulation de la réservation'
             ], 500);
         }
+    }
+
+    /**
+     * Récupérer l'historique des réservations traitées (confirmées, refusées, annulées)
+     */
+    public function getHistory(Request $request)
+    {
+        try {
+            // Récupérer les paramètres de filtrage
+            $limit = $request->get('limit', 50);
+            $page = $request->get('page', 1);
+            $statut = $request->get('statut');
+            $site_id = $request->get('site_id');
+            $date_from = $request->get('date_from');
+            $date_to = $request->get('date_to');
+            $search = $request->get('search');
+
+            // Construire la requête
+            $query = Reservation::with(['user', 'local.site', 'validator'])
+                ->whereIn('statut', ['confirmee', 'refusee', 'annulee_utilisateur', 'annulee_admin']);
+
+            // Filtrer par statut si spécifié
+            if ($statut && in_array($statut, ['confirmee', 'refusee', 'annulee_utilisateur', 'annulee_admin'])) {
+                $query->where('statut', $statut);
+            }
+
+            // Filtrer par site
+            if ($site_id) {
+                $query->whereHas('local', function ($q) use ($site_id) {
+                    $q->where('site_id', $site_id);
+                });
+            }
+
+            // Filtrer par plage de dates
+            if ($date_from) {
+                $query->where('date_debut', '>=', $date_from);
+            }
+            if ($date_to) {
+                $query->where('date_fin', '<=', $date_to);
+            }
+
+            // Recherche textuelle
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('user', function ($subQ) use ($search) {
+                        $subQ->where('name', 'like', "%{$search}%")
+                             ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('local', function ($subQ) use ($search) {
+                        $subQ->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhere('motif', 'like', "%{$search}%");
+                });
+            }
+
+            // Trier par date décroissante (plus récentes en premier)
+            $reservations = $query->orderBy('date_debut', 'desc')
+                ->paginate($limit, ['*'], 'page', $page);
+
+            // Transformer les données pour la réponse
+            $data = $reservations->map(function ($reservation) {
+                return [
+                    'id' => $reservation->id,
+                    'nom_demandeur' => $reservation->user?->name ?? 'N/A',
+                    'email_demandeur' => $reservation->user?->email ?? 'N/A',
+                    'salle' => $reservation->local?->name ?? 'N/A',
+                    'lieu' => $reservation->local?->site?->name ?? 'N/A',
+                    'date_debut' => $reservation->date_debut ? $reservation->date_debut->format('Y-m-d') : 'N/A',
+                    'heure_debut' => $this->getHeureDebut($reservation->creneau),
+                    'heure_fin' => $this->getHeureFin($reservation->creneau),
+                    'raison' => $reservation->motif ?? 'N/A',
+                    'type_reunion' => $reservation->nature_evenement ?? 'N/A',
+                    'nombre_participants' => $reservation->participants_estimes ?? 0,
+                    'status' => $reservation->statut ?? 'N/A',
+                    'commentaire_admin' => $reservation->commentaire_admin,
+                    'validated_by' => $reservation->validator?->name,
+                    'validated_at' => $reservation->validated_at ? $reservation->validated_at->format('Y-m-d H:i:s') : null,
+                    'cancelled_by' => null,
+                    'cancelled_at' => $reservation->cancelled_at ? $reservation->cancelled_at->format('Y-m-d H:i:s') : null,
+                    'cancellation_reason' => $reservation->cancellation_reason
+                ];
+            })->all();
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+                'pagination' => [
+                    'total' => $reservations->total(),
+                    'page' => $reservations->currentPage(),
+                    'limit' => $reservations->perPage(),
+                    'totalPages' => $reservations->lastPage()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error in getHistory: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération de l\'historique: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtenir l'heure de début selon le créneau
+     */
+    private function getHeureDebut($creneau)
+    {
+        return match ($creneau) {
+            'matin' => '08:00',
+            'apres-midi' => '14:00',
+            'journee-complete' => '08:00',
+            default => '08:00'
+        };
+    }
+
+    /**
+     * Obtenir l'heure de fin selon le créneau
+     */
+    private function getHeureFin($creneau)
+    {
+        return match ($creneau) {
+            'matin' => '12:00',
+            'apres-midi' => '18:00',
+            'journee-complete' => '18:00',
+            default => '18:00'
+        };
     }
 }

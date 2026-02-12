@@ -1,0 +1,3 @@
+TOKEN:40|Sw9Ca1T7laIAPOsKgjtNE44wzV9S6I0fMhdSdSLmc203cb4d
+EMAIL:dev.admin@local
+PASSWORD:Admin123456!

@@ -1,0 +1,27 @@
+{
+    "ok": true,
+    "time": "2026-02-12T01:22:39+00:00",
+    "class": "Illuminate\\Pagination\\LengthAwarePaginator",
+    "total": 2,
+    "count": 2,
+    "items": [
+        {
+            "id": 7,
+            "reservation_id": 11,
+            "action": "validated",
+            "user_id": 1,
+            "statut_ancien": "en_attente",
+            "statut_nouveau": "validee",
+            "created_at": "2026-02-10T19:32:17.000000Z"
+        },
+        {
+            "id": 6,
+            "reservation_id": 11,
+            "action": "created",
+            "user_id": 11,
+            "statut_ancien": null,
+            "statut_nouveau": "en_attente",
+            "created_at": "2026-02-10T19:31:54.000000Z"
+        }
+    ]
+}

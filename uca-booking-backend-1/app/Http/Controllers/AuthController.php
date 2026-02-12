@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log as LaravelLog;
 use Illuminate\Support\Facades\Hash;
 use Google_Client;
+use GuzzleHttp\Client;
 
 class AuthController extends Controller
 {
@@ -182,6 +183,15 @@ class AuthController extends Controller
 
             // Vérifier le token Google
             $client = new Google_Client(['client_id' => $googleClientId]);
+
+            // Configure SSL verification based on environment
+            $verifySsl = config('services.google.verify_ssl', true);
+            $httpClient = new \GuzzleHttp\Client([
+                'verify' => $verifySsl,
+                'http_errors' => false,
+            ]);
+            $client->setHttpClient($httpClient);
+
             $payload = $client->verifyIdToken($request->token);
 
             if (!$payload) {
@@ -222,8 +232,11 @@ class AuthController extends Controller
                     'email' => $email,
                     'name' => $payload['name'],
                     'picture' => $payload['picture'] ?? null,
+                    'password' => null,  // Google users don't have password
+                    'fonction' => null,  // Google users don't have fonction by default
                     'role' => 'user',
-                    'is_active' => true
+                    'is_active' => true,
+                    'last_login' => now()
                 ]);
             } else {
                 // Vérifier si le compte est actif
@@ -236,6 +249,7 @@ class AuthController extends Controller
 
                 // Mettre à jour les infos
                 $user->update([
+                    'google_id' => $payload['sub'],  // Ensure google_id is set even for existing users
                     'picture' => $payload['picture'] ?? $user->picture,
                     'last_login' => now()
                 ]);

@@ -1,0 +1,50 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('reservation_histories', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('reservation_id')->constrained('reservations')->cascadeOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+
+            // Action effectuée (created, updated, validated, refused, cancelled, etc.)
+            $table->string('action');
+
+            // État avant et après
+            $table->json('old_values')->nullable();
+            $table->json('new_values')->nullable();
+
+            // Informations supplémentaires
+            $table->string('statut_ancien')->nullable();
+            $table->string('statut_nouveau')->nullable();
+            $table->text('raison')->nullable();
+
+            // Métadonnées
+            $table->string('ip_address')->nullable();
+            $table->string('user_agent')->nullable();
+            $table->text('description')->nullable();
+
+            $table->timestamps();
+
+            // Index pour améliorer les performances
+            $table->index('reservation_id');
+            $table->index(['reservation_id', 'created_at']);
+            $table->index('user_id');
+            $table->index('action');
+            $table->index('created_at');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('reservation_histories');
+    }
+};
+

@@ -36,6 +36,7 @@ return [
 
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
+        'verify_ssl' => env('GOOGLE_VERIFY_SSL', true),
     ],
 
     'allowed_domains' => env('ALLOWED_DOMAINS', '@uca.ma,@uca.ac.ma'),
