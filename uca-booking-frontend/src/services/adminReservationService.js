@@ -24,3 +24,10 @@ export async function refuseAdminReservation(id, commentaire_admin) {
   return data;
 }
 
+export async function getReservationHistory(params = {}) {
+  const { data } = await api.get('/admin/reservation-histories', { params });
+  if (!data?.success) {
+    throw new Error(data?.message || 'Erreur lors du chargement de l\'historique');
+  }
+  return data;
+}

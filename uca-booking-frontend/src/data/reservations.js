@@ -11,12 +11,12 @@ export const reservations = [
     creneau: 'Matin',
     heureDebut: '09:00',
     heureFin: '12:00',
-    status: 'pending',
+    status: 'confirmed',
     fonction: 'Professeur',
     event: 'Conférence',
     motif: 'Conférence sur l\'Intelligence Artificielle',
     participants: 150,
-    commentaire: ''
+    commentaire: 'Validé - Équipement AV confirmé'
   },
   {
     id: 2,
@@ -49,12 +49,12 @@ export const reservations = [
     creneau: 'Journée complète',
     heureDebut: '09:00',
     heureFin: '17:00',
-    status: 'pending',
+    status: 'confirmed',
     fonction: 'Chef de service',
     event: 'Signature de convention',
     motif: 'Signature de partenariat international',
     participants: 20,
-    commentaire: ''
+    commentaire: 'Confirmé - Accord signé'
   },
   {
     id: 4,
@@ -68,12 +68,12 @@ export const reservations = [
     creneau: 'Multi-jours',
     heureDebut: '09:00',
     heureFin: '17:00',
-    status: 'pending',
+    status: 'confirmed',
     fonction: 'Professeur',
     event: 'Congrès',
     motif: 'Congrès international de recherche',
     participants: 80,
-    commentaire: ''
+    commentaire: 'Confirmé - Accès aux salles accordé'
   },
   {
     id: 5,
@@ -125,12 +125,12 @@ export const reservations = [
     creneau: 'Matin',
     heureDebut: '08:00',
     heureFin: '13:00',
-    status: 'pending',
+    status: 'refused',
     fonction: 'Chef de division',
     event: 'Formation',
     motif: 'Formation des nouveaux enseignants',
     participants: 40,
-    commentaire: ''
+    commentaire: 'Refusé - Capacité de la salle insuffisante'
   },
   {
     id: 8,
@@ -150,5 +150,62 @@ export const reservations = [
     motif: 'Réunion de département',
     participants: 25,
     commentaire: 'Refusé - Salle réservée pour événement prioritaire'
+  },
+  {
+    id: 9,
+    user: 'Pr. Mohammed Ouissaden',
+    email: 'm.ouissaden@uca.ma',
+    local: 'Salle Séminaire 3',
+    site: 'Cité d\'Innovation',
+    date: '2026-01-15',
+    dateDebut: '2026-01-15',
+    dateFin: '2026-01-15',
+    creneau: 'Matin',
+    heureDebut: '10:00',
+    heureFin: '12:00',
+    status: 'confirmed',
+    fonction: 'Professeur',
+    event: 'Séminaire',
+    motif: 'Séminaire sur les TIC',
+    participants: 45,
+    commentaire: 'Confirmé - Projets à disposition'
+  },
+  {
+    id: 10,
+    user: 'Dr. Nadia Bennani',
+    email: 'n.bennani@uca.ac.ma',
+    local: 'Salle Réunion C2',
+    site: 'Centre de Conférences',
+    date: '2026-02-08',
+    dateDebut: '2026-02-08',
+    dateFin: '2026-02-08',
+    creneau: 'Après-midi',
+    heureDebut: '14:00',
+    heureFin: '16:30',
+    status: 'cancelled',
+    fonction: 'Professeur',
+    event: 'Réunion',
+    motif: 'Réunion du comité pédagogique',
+    participants: 12,
+    commentaire: 'Annulée - Report à date ultérieure'
+  },
+  {
+    id: 11,
+    user: 'pending',
+    email: 'pending@uca.ma',
+    local: 'Room 1',
+    site: 'Présidence',
+    date: '2026-02-20',
+    dateDebut: '2026-02-20',
+    dateFin: '2026-02-20',
+    creneau: 'Matin',
+    heureDebut: '09:00',
+    heureFin: '11:00',
+    status: 'pending',
+    fonction: 'Administrateur',
+    event: 'Réunion',
+    motif: 'Réunion en attente',
+    participants: 5,
+    commentaire: ''
   }
 ];
