@@ -1,21 +1,24 @@
 import React from 'react';
 import { Calendar, Users, Clock } from 'lucide-react';
 import { sites, getSiteBadgeColor } from '../data/sites';
-import { useNavigate } from 'react-router-dom'; //  Import pour la navigation
+import { useNavigate } from 'react-router-dom';
 
 const LocalCard = ({ local }) => {
-  const navigate = useNavigate(); //  Hook React Router
+  const navigate = useNavigate();
   const siteName = sites.find(s => s.id === local.site)?.name;
 
-  // Fonction appelée au clic sur "Réserver"
   const handleReserve = () => {
-    navigate(`/reservation/${local.id}`); //  Redirection vers la page de réservation
+    navigate(`/reservation/${local.id}`);
+  };
+
+  const handleViewAvailability = () => {
+    navigate(`/disponibilites/${local.id}`);
   };
 
   return (
     <div
-      className={`bg-white rounded-2xl shadow-lg overflow-hidden 
-                  border-2 border-transparent 
+      className={`bg-white rounded-2xl shadow-lg overflow-hidden
+                  border-2 border-transparent
                   hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-400/50
                   transform transition-all duration-500 hover:-translate-y-2 hover:scale-105
                   animate-pulse-slow`}
@@ -73,15 +76,19 @@ const LocalCard = ({ local }) => {
         {/* Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={handleReserve} // 👈 Redirection au clic
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg 
+            onClick={handleReserve}
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg
                        hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 font-medium text-sm"
           >
             <Calendar className="w-4 h-4" />
             <span>Réserver</span>
           </button>
 
-          <button className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all">
+          <button
+            onClick={handleViewAvailability}
+            className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+            title="Voir les disponibilités"
+          >
             <Clock className="w-4 h-4" />
           </button>
         </div>

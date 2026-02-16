@@ -88,10 +88,6 @@ const ReservationPage = () => {
   const handleSubmitReservation = async () => {
     try {
       const motif = (formData.motif || '').trim();
-      if (motif.length < 10) {
-        alert('Le motif doit contenir au moins 10 caractères.');
-        return;
-      }
 
       // Mapping Front -> API Laravel
       const payload = {
@@ -104,7 +100,7 @@ const ReservationPage = () => {
             : formData.creneau, // matin | apres-midi | journee-complete
         nature_evenement: formData.natureEvenement,
         participants_estimes: Number(formData.participants),
-        motif,
+        motif: motif || undefined,
       };
 
       const result = await createReservation(payload);
@@ -405,15 +401,14 @@ const ReservationPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Motif de la réservation *
+                  Motif de la réservation
                 </label>
                 <textarea
                   value={formData.motif}
                   onChange={(e) => handleInputChange('motif', e.target.value)}
                   rows="4"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-800"
-                  placeholder="Décrivez brièvement l'objet de votre réservation..."
-                  required
+                  placeholder="Décrivez brièvement l'objet de votre réservation (optionnel)..."
                 />
               </div>
             </div>
@@ -443,7 +438,7 @@ const ReservationPage = () => {
             ) : (
               <button
                 onClick={handleSubmitReservation}
-                disabled={formData.motif.trim().length < 10}
+                disabled={false}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirmer la réservation

@@ -12,6 +12,7 @@ import ReservationsPage from './pages/ReservationsPage';
 import HistoriquePage from './pages/HistoriquePage';
 import CalendrierPage from './pages/CalendrierPage';
 import MaintenancePage from './pages/MaintenancePage';
+import DisponibilitesPage from './pages/DisponibilitesPage';
 
 function App() {
   const { ToastContainer } = useToast();
@@ -33,6 +34,13 @@ function App() {
           <Route path="/reservation/:localId" element={
             <ProtectedRoute>
               <ReservationPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/disponibilites/:localId" element={
+            <ProtectedRoute>
+              <DisponibilitesPage />
+
             </ProtectedRoute>
           } />
 
