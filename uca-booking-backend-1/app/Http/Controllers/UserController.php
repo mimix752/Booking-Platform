@@ -89,7 +89,8 @@ class UserController extends Controller
     public function updateProfile(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'fonction' => 'required|in:Professeur,Personnel administratif,Chef de service,Chef de division,Directeur de pôle,Autre'
+            'fonction' => 'sometimes|in:Professeur,Personnel administratif,Chef de service,Chef de division,Directeur de pôle,Autre',
+            'telephone' => 'sometimes|string|min:6|max:20'
         ]);
 
         if ($validator->fails()) {
@@ -102,7 +103,10 @@ class UserController extends Controller
 
         try {
             $user = $request->user();
-            $user->update(['fonction' => $request->fonction]);
+            $fields = [];
+            if ($request->has('fonction')) $fields['fonction'] = $request->fonction;
+            if ($request->has('telephone')) $fields['telephone'] = $request->telephone;
+            $user->update($fields);
 
             return response()->json([
                 'success' => true,

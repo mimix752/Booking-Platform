@@ -26,7 +26,7 @@ class ReservationController extends Controller
             'creneau' => 'required|in:matin,apres-midi,journee-complete',
             'nature_evenement' => 'required|in:reunion,audience,convention,conference,congres',
             'participants_estimes' => 'required|integer|min:1|max:1000',
-            'motif' => 'required|string|min:10|max:500'
+            'motif' => 'nullable|string'
         ]);
 
         if ($validator->fails()) {
@@ -39,15 +39,6 @@ class ReservationController extends Controller
 
         try {
             $user = $request->user();
-
-            // Vérifier le nombre de réservations actives
-            $maxReservations = env('MAX_RESERVATIONS_PER_USER', 5);
-            if ($user->active_reservations_count >= $maxReservations) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Vous avez atteint la limite de {$maxReservations} réservations actives"
-                ], 400);
-            }
 
             // Vérifier si c'est un jour blackout
             if (BlackoutDate::isBlackout($request->date_debut)) {

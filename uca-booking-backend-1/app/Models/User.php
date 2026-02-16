@@ -17,6 +17,7 @@ class User extends Authenticatable
         'name',
         'picture',
         'fonction',
+        'telephone',
         'role',
         'is_active',
         'last_login',

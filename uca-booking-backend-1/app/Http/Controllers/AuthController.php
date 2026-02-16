@@ -78,6 +78,7 @@ class AuthController extends Controller
                         'picture' => $user->picture,
                         'role' => $user->role,
                         'fonction' => $user->fonction,
+                        'telephone' => $user->telephone,
                     ]
                 ]
             ], 201);
@@ -147,6 +148,7 @@ class AuthController extends Controller
                         'picture' => $user->picture,
                         'role' => $user->role,
                         'fonction' => $user->fonction,
+                        'telephone' => $user->telephone,
                     ]
                 ]
             ]);
@@ -280,7 +282,8 @@ class AuthController extends Controller
                         'name' => $user->name,
                         'picture' => $user->picture,
                         'role' => $user->role,
-                        'fonction' => $user->fonction
+                        'fonction' => $user->fonction,
+                        'telephone' => $user->telephone
                     ]
                 ]
             ]);
@@ -313,7 +316,8 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'picture' => $user->picture,
                 'role' => $user->role,
-                'fonction' => $user->fonction
+                'fonction' => $user->fonction,
+                'telephone' => $user->telephone
             ]
         ]);
     }
