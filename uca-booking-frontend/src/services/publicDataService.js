@@ -8,6 +8,7 @@ export async function getSites() {
 
 export async function getLocaux(params = {}) {
   const { data } = await api.get('/locaux', { params });
+  console.log('Réponse API /locaux:', data); // DEBUG
   if (!data?.success) throw new Error(data?.message || 'Erreur chargement locaux');
   return data.data;
 }
@@ -17,4 +18,3 @@ export async function getSiteLocaux(siteId) {
   if (!data?.success) throw new Error(data?.message || 'Erreur chargement locaux du site');
   return data.data;
 }
-

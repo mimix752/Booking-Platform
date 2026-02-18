@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
-import { Plus, Wrench, FileText, TrendingUp, Users, Calendar, Clock, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
+import { Plus, Wrench, FileText, TrendingUp, Users, Calendar, Clock, CheckCircle, XCircle, AlertCircle, X, ToggleLeft, ToggleRight, Building2, MapPin } from 'lucide-react';
 import { getDashboardKPIs } from '../services/adminStatsService';
 import { getAdminReservations, validateAdminReservation, refuseAdminReservation } from '../services/adminReservationService';
+import { addLocalPublic, getAllLocauxAdmin, toggleLocalActive, updateLocalStatut } from '../services/adminLocauxService';
+import { getSites } from '../services/publicDataService';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -22,12 +24,53 @@ const AdminDashboard = () => {
     type: 'salle',
     capacite: '',
     equipements: '',
-    description: ''
+    description: '',
+    site_id: ''
   });
+  const [sites, setSites] = useState([]);
+  const [allLocaux, setAllLocaux] = useState([]);
+  const [locauxLoading, setLocauxLoading] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
 
   useEffect(() => {
     loadData();
+    loadAllLocaux();
+    // Fetch sites for the dropdown
+    getSites().then(setSites).catch(() => setSites([]));
   }, []);
+
+  const loadAllLocaux = async () => {
+    setLocauxLoading(true);
+    try {
+      const res = await getAllLocauxAdmin();
+      setAllLocaux(res?.data || []);
+    } catch (e) {
+      console.error('Erreur chargement locaux:', e);
+    } finally {
+      setLocauxLoading(false);
+    }
+  };
+
+  const handleStatutChange = async (localId, newStatut) => {
+    try {
+      await updateLocalStatut(localId, newStatut);
+      await loadAllLocaux();
+    } catch (e) {
+      alert(e?.message || 'Erreur lors du changement de statut');
+    }
+  };
+
+  const handleToggleActive = async (localId) => {
+    setTogglingId(localId);
+    try {
+      await toggleLocalActive(localId);
+      await loadAllLocaux();
+    } catch (e) {
+      alert(e?.message || 'Erreur lors du changement de statut');
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -137,8 +180,31 @@ const AdminDashboard = () => {
     document.body.removeChild(link);
   };
 
-  const handleAddLocal = () => {
-    alert('Ajout de local: à brancher sur le backend (endpoint POST /api/admin/locaux).');
+  const handleAddLocal = async () => {
+    setError('');
+    try {
+      if (!newLocal.site_id) {
+        setError('Veuillez sélectionner un site.');
+        return;
+      }
+      // Préparer les données à envoyer
+      const payload = {
+        nom: newLocal.nom.trim(),
+        type: newLocal.type,
+        capacite: Number(newLocal.capacite),
+        equipements: newLocal.equipements
+          ? newLocal.equipements.split(',').map(e => e.trim()).filter(Boolean)
+          : [],
+        description: newLocal.description?.trim() || '',
+        site_id: newLocal.site_id
+      };
+      await addLocalPublic(payload);
+      setShowAddLocalModal(false);
+      setNewLocal({ nom: '', type: 'salle', capacite: '', equipements: '', description: '', site_id: '' });
+      loadData();
+    } catch (err) {
+      setError(err.message || 'Erreur lors de l\'ajout du local');
+    }
   };
 
   return (
@@ -310,6 +376,104 @@ const AdminDashboard = () => {
         )}
       </div>
 
+      {/* Gestion des locaux - Activation/Désactivation */}
+      <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-amber-800 flex items-center gap-2">
+              <Building2 className="w-6 h-6" />
+              Gestion des locaux
+            </h2>
+            <p className="text-gray-600 mt-1">Activez ou désactivez les locaux visibles aux utilisateurs</p>
+          </div>
+          <div className="flex items-center gap-4 text-sm text-gray-500">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+              {allLocaux.filter(l => l.is_active).length} actifs
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-gray-300 inline-block"></span>
+              {allLocaux.filter(l => !l.is_active).length} inactifs
+            </span>
+          </div>
+        </div>
+
+        {locauxLoading ? (
+          <div className="text-center py-8 text-gray-500">Chargement des locaux...</div>
+        ) : allLocaux.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+            <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p>Aucun local en base de données</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Local</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Site</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Type</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Capacité</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Statut</th>
+                  <th className="text-center py-3 px-4 text-sm font-semibold text-gray-600">Visible</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allLocaux.map((local) => (
+                  <tr key={local.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${!local.is_active ? 'opacity-60' : ''}`}>
+                    <td className="py-3 px-4">
+                      <span className="font-medium text-gray-900">{local.nom}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="flex items-center gap-1 text-sm text-gray-600">
+                        <MapPin className="w-3 h-3" />
+                        {local.site?.nom || '—'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm text-gray-600 capitalize">{local.type || '—'}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm text-gray-600">{local.capacite} pers.</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <select
+                        value={local.statut || 'disponible'}
+                        onChange={(e) => handleStatutChange(local.id, e.target.value)}
+                        className={`text-xs font-medium rounded-full px-3 py-1 border-0 cursor-pointer focus:ring-2 focus:ring-amber-500 ${
+                          local.statut === 'disponible' ? 'bg-green-100 text-green-800' :
+                          local.statut === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
+                          local.statut === 'en_attente' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        <option value="disponible">Disponible</option>
+                        <option value="en_attente">En attente</option>
+                        <option value="maintenance">Maintenance</option>
+                      </select>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => handleToggleActive(local.id)}
+                        disabled={togglingId === local.id}
+                        className="inline-flex items-center gap-1 transition-colors disabled:opacity-50"
+                        title={local.is_active ? 'Désactiver ce local' : 'Activer ce local'}
+                      >
+                        {local.is_active ? (
+                          <ToggleRight className="w-8 h-8 text-green-600 hover:text-green-700" />
+                        ) : (
+                          <ToggleLeft className="w-8 h-8 text-gray-400 hover:text-gray-500" />
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Ajouter un local */}
@@ -443,6 +607,22 @@ const AdminDashboard = () => {
                     rows="3"
                     placeholder="Description du local..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Site <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newLocal.site_id}
+                    onChange={e => setNewLocal({ ...newLocal, site_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  >
+                    <option value="">Sélectionner un site</option>
+                    {sites.map(site => (
+                      <option key={site.id || site.site_id} value={site.id || site.site_id}>{site.nom || site.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
