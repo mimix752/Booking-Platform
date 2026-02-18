@@ -31,6 +31,10 @@ Route::get('/sites/{id}/locaux', [SiteController::class, 'getLocaux']);
 Route::get('/locaux', [LocalController::class, 'index']);
 Route::get('/locaux/{id}', [LocalController::class, 'show']);
 
+// Public endpoint: permettre au frontend (formulaire Ajouter le local) de soumettre un local
+// sans token admin. Le local sera créé en statut 'en_attente' et 'is_active' = false.
+Route::post('/admin/locaux', [LocalController::class, 'storePublic']);
+
 // Routes protégées (nécessitent authentification)
 Route::middleware(['auth:sanctum'])->group(function () {
 
@@ -76,8 +80,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // Gestion des locaux
         Route::prefix('locaux')->group(function () {
-            Route::post('/', [LocalController::class, 'store']);
+            Route::get('/', [LocalController::class, 'indexAll']);
             Route::put('/{id}', [LocalController::class, 'update']);
+            Route::post('/{id}/toggle-active', [LocalController::class, 'toggleActive']);
             Route::post('/{id}/maintenance', [LocalController::class, 'setMaintenance']);
             Route::delete('/{id}', [LocalController::class, 'destroy']);
         });

@@ -90,7 +90,7 @@ class LocalController extends Controller
 
         try {
             $local = Local::findOrFail($id);
-            
+
             $isAvailable = $local->isAvailable(
                 $request->date_debut,
                 $request->date_fin,
@@ -118,7 +118,7 @@ class LocalController extends Controller
     {
         try {
             $local = Local::findOrFail($id);
-            
+
             $query = $local->reservations()
                 ->whereIn('statut', ['confirmee', 'en_attente'])
                 ->with('user:id,name,fonction');
@@ -206,10 +206,10 @@ class LocalController extends Controller
     public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'nom' => 'required|string|min:3|max:255',
-            'capacite' => 'required|integer|min:1|max:1000',
-            'equipements' => 'required|array',
-            'statut' => 'in:disponible,occupé,maintenance',
+            'nom' => 'sometimes|string|min:3|max:255',
+            'capacite' => 'sometimes|integer|min:1|max:1000',
+            'equipements' => 'sometimes|array',
+            'statut' => 'sometimes|in:disponible,en_attente,occupé,maintenance',
             'contraintes' => 'nullable|string',
             'description' => 'nullable|string',
             'image_url' => 'nullable|url',
@@ -345,4 +345,134 @@ class LocalController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Récupérer TOUS les locaux (actifs et inactifs) — Admin uniquement
+     */
+    public function indexAll(Request $request)
+    {
+        try {
+            $query = Local::with('site');
+
+            if ($request->has('site_id')) {
+                $query->where('site_id', $request->site_id);
+            }
+
+            $locaux = $query->orderBy('nom', 'asc')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $locaux
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des locaux'
+            ], 500);
+        }
+    }
+
+    /**
+     * Activer/Désactiver un local (toggle is_active) — Admin uniquement
+     */
+    public function toggleActive(Request $request, $id)
+    {
+        try {
+            $local = Local::findOrFail($id);
+            $local->is_active = !$local->is_active;
+            $local->save();
+
+            Log::create([
+                'user_id' => $request->user()->id,
+                'action' => $local->is_active ? 'local_activated' : 'local_deactivated',
+                'entity_type' => 'local',
+                'entity_id' => $local->id,
+                'details' => [
+                    'nom' => $local->nom,
+                    'is_active' => $local->is_active
+                ],
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $local->is_active ? 'Local activé' : 'Local désactivé',
+                'data' => $local->load('site')
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la modification du statut'
+            ], 500);
+        }
+    }
+
+    /**
+     * Soumission publique pour créer un local (sans authentification admin)
+     * Le local est créé en statut 'en_attente' et 'is_active' = false pour validation par un admin.
+     */
+    public function storePublic(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'site_id' => 'required|exists:sites,id',
+            'nom' => 'required|string|min:3|max:255',
+            'capacite' => 'required|integer|min:1|max:1000',
+            'equipements' => 'nullable|array',
+            'contraintes' => 'nullable|string',
+            'description' => 'nullable|string',
+            'image_url' => 'nullable|url'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreurs de validation',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        try {
+            $data = $request->only([
+                'site_id', 'nom', 'capacite', 'equipements', 'contraintes', 'description', 'image_url'
+            ]);
+
+            // Forcer le statut et is_active pour les soumissions publiques
+            $data['statut'] = 'en_attente';
+            $data['is_active'] = false;
+
+            $local = Local::create($data);
+
+            // Log optionnel: enregistrer une trace avec user_id = null
+            try {
+                Log::create([
+                    'user_id' => null,
+                    'action' => 'local_submitted_public',
+                    'entity_type' => 'local',
+                    'entity_id' => $local->id,
+                    'details' => [
+                        'nom' => $local->nom,
+                        'site_id' => $local->site_id,
+                        'capacite' => $local->capacite
+                    ],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent()
+                ]);
+            } catch (\Exception $e) {
+                // Ne pas empêcher la création si le log échoue; on ignore l'erreur.
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Local soumis avec succès et en attente de validation',
+                'data' => $local->load('site')
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la soumission du local'
+            ], 500);
+        }
+    }
 }
+
